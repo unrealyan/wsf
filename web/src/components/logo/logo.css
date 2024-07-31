@@ -1,0 +1,44 @@
+.icon {
+    width: 60px;
+    height: 60px;
+    background-color: #000;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+}
+.connection {
+    width: 30px;
+    height: 30px;
+    border: 3px solid #3498db;
+    border-radius: 50%;
+    position: absolute;
+}
+.connection:first-child {
+    top: 5px;
+    left: 5px;
+}
+.connection:last-child {
+    bottom: 5px;
+    right: 5px;
+}
+.connection-line {
+    width: 20px;
+    height: 2px;
+    background-color: #3498db;
+    position: absolute;
+    transform: rotate(45deg);
+    top: 29px;
+    left: 20px;
+}
+.site-name {
+    bottom: 10px;
+    font-size: 24px;
+    font-weight: bold;
+    color: #000;
+    letter-spacing: 2px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
