@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	MAIN_SERVER_PORT      = 6888
+	// MAIN_SERVER_PORT      = 6888
 	WEBSOCKET_SERVER_PORT = 8895
 )
 
