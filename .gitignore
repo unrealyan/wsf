@@ -1,2 +1,4 @@
 wsf.tar
 .vscode/
+dist/
+node_modules/
