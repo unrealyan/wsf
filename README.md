@@ -37,16 +37,10 @@ To compile the backend for Linux ARM64, use: GOOS=linux GOARCH=arm64 go build -o
 
 ## Getting Started
 
-[Add instructions for setting up and running the project locally]
+```
+npm run dev
 
-## Contributing
+go run main
+```
 
-[Add guidelines for contributing to the project]
 
-## License
-
-[Specify the license under which this project is released]
-
-## Contact
-
-[Provide contact information or links for support and inquiries]
