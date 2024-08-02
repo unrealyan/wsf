@@ -3,3 +3,4 @@ wsf.tar
 dist/
 node_modules/
 .DS_Store
+__debug_bin*
