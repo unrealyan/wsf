@@ -1,22 +1,19 @@
-import { createEffect, createSignal, onMount, type Component } from 'solid-js';
-import { createStore, type SetStoreFunction, type Store } from "solid-js/store";
+import { createEffect, onMount, type Component } from 'solid-js';
+import { createStore } from "solid-js/store";
 import Upload from './components/upload';
 import WebRTC from './lib/webrtc';
 import LargeFileReceiver from './lib/largeFileReceiver';
 import AcceptBanner from './components/acceptBanner';
 import Header from './components/header';
 import ProgressBar from "./components/progress/progress";
-import Reciever from './boards/reciever';
+import Receiver from './boards/reciever';
 import Copy from './components/copy';
+import WebSocketClient, { StoreType } from './lib/webSocket';
 
+const urlSP = new URLSearchParams(window.location.search);
 
-
-
-const WEBSOCKET_URL = `ws://${location.hostname}:8895/ws`
-let webrtc: WebRTC
-let urlSP = new URLSearchParams(window.location.search)
 const App: Component = () => {
-  let [store, setStore] = createStore({
+  const [store, setStore] = createStore<StoreType>({
     userId: "",
     targetId: "",
     userIds: [],
@@ -24,216 +21,164 @@ const App: Component = () => {
     shareId: "",
     searchParam: urlSP,
     progress: 0,
-    fileStream: Promise<any>,
-    ws: new WebSocket(`${WEBSOCKET_URL}${urlSP.get("s") ? "?s=" + urlSP.get("s") : ""}`),
-    role: "sender"
-  })
+    fileStream: null,
+    ws: null,
+    role: urlSP.get("s") ? "receiver" : "sender"
+  });
 
-  let acceotRef: {
-    [x: string]: any; open: any; close: () => void;
-  };
+  let acceptRef: { open: () => void, close: () => void };
+  let userProgressRef: { open: () => void, close: () => void, setValue: (value: number) => void, setSpeed: (speed: number) => void, setDone: (done: boolean) => void };
+  let receiverProgressRef: { open: () => void, setValue: (value: number) => void, setSpeed: (speed: number) => void, setDone: (done: boolean) => void };
 
-
-  let userProgressRef: {
-    [x: string]: any; open: () => void;
-  }
-  let receiverProgressRef: {
-    [x: string]: any; open: () => void;
-  }
+  let webrtc: WebRTC;
+  let wsClient: WebSocketClient;
 
   onMount(() => {
-    const { ws } = store;
-    webrtc = new WebRTC(ws)
-  })
+    wsClient = new WebSocketClient(userProgressRef, acceptRef);
+    webrtc = new WebRTC(wsClient.ws);
+    
+    wsClient.listen(store, setStore, webrtc);
+    setStore('ws', wsClient.ws);
+
+    wsClient.ws.addEventListener('message', handleWebSocketMessage);
+  });
 
   createEffect(() => {
-
-    const { ws } = store;
-    webrtc.onmessage = function (e: any) {
-      if (e.type === "progress") {
-        setStore("progress", () => e.data)
-        userProgressRef?.setValue(e.data)
-        userProgressRef?.setSpeed(e.speed)
-        receiverProgressRef?.setValue(e.data)
-        receiverProgressRef?.setSpeed(e.speed)
-      } else if (e.type === "fileReceived") {
-        userProgressRef?.setDone(true)
-        receiverProgressRef?.setDone(true)
-        acceotRef.close()
-      }
+    if (webrtc) {
+      webrtc.onmessage = handleWebRTCMessage;
     }
-
-    if (store.searchParam.get("s")) {
-      setStore("role", () => "receiver")
+    if (store.ws) {
+      store.ws.onclose = () => {
+        console.log("WebSocket connection closed...")
+      };
     }
-
-    if (!store.file) {
-      userProgressRef?.close()
+    if (!store.file) userProgressRef?.close();
+    if (acceptRef){
+      wsClient.acceptRef = acceptRef;
     }
-
-
-    ws.onclose = () => {
-      console.log("WebSocket connection closed...");
-    };
-    ws.onmessage = (e) => {
-
-      let data = JSON.parse(e.data);
-
-      if (data.type === "user-id") {
-
-        setStore("userId", () => data.userId)
-        if (data.shareId) {
-          setStore("shareId", () => data.shareId)
-        }
-
-        if (store.searchParam.get("s")) {
-          ws.send(JSON.stringify({
-            type: "receiver",
-            userId: data.userId
-          }))
-        } else {
-          ws.send(JSON.stringify({
-            type: "sender",
-            userId: data.userId
-          }))
-        }
-
-
-      }
-
-      if (data.type === "all-receivers") {
-        setStore("userIds", () => data.userIds || [])
-      }
-
-      if (data.type === "join") {
-        webrtc.createOffer(data.target, store, setStore);
-      }
-
-      if (data.type === "offer") {
-        let sourceUserId = data.name;
-        let offer = data.sdp;
-
-        webrtc.createAnswer(sourceUserId, offer, setStore);
-      }
-
-      if (data.type === "answer") {
-        let answer = data.sdp;
-        webrtc.addAnswer(answer);
-      }
-
-      if (data.type === "new-ice-candidate") {
-        const candidate = new RTCIceCandidate(data.candidate);
-        webrtc.addIceCandidates(candidate);
-      }
-
-      if (data.type === "request-status") {
-        if (data.status === "accepted") {
-          userProgressRef.open()
-          ws.send(JSON.stringify({
-            type: "initiate",
-            userId: store.userId,
-            shareId: store.shareId,
-            target: data.userId
-          }));
-        }
-      }
-
-      if (data.type === "accept-request") {
-        setStore({
-          file: data.file,
-          targetId: data.userId
-        })
-
-        acceotRef.open()
-      }
+    if (userProgressRef) {
+      wsClient.userProgressRef = userProgressRef;
     }
-  })
+  });
 
+  const handleWebSocketMessage = (event: MessageEvent) => {
+    const data = JSON.parse(event.data);
+    if (data.type === 'file-transfer-request') {
+      handleFileTransferRequest(data);
+    }
+    // Handle other message types as needed
+  };
+
+  const handleFileTransferRequest = (data: any) => {
+    setStore('targetId', data.senderId);
+    setStore('file', {
+      name: data.fileName,
+      size: data.fileSize,
+      type: data.fileType
+    });
+    acceptRef?.open();
+  };
+
+  const handleWebRTCMessage = (e: any) => {
+    if (e.type === "progress") {
+      setStore("progress", e.data);
+      updateProgress(e.data, e.speed);
+    } else if (e.type === "fileReceived") {
+      setProgressDone();
+    }
+  };
+
+  const updateProgress = (value: number, speed: number) => {
+    userProgressRef?.setValue(value);
+    userProgressRef?.setSpeed(speed);
+    receiverProgressRef?.setValue(value);
+    receiverProgressRef?.setSpeed(speed);
+  };
+
+  const setProgressDone = () => {
+    userProgressRef?.setDone(true);
+    receiverProgressRef?.setDone(true);
+    acceptRef?.close();
+  };
 
   const onInvite = (targetId: string) => {
-    const { ws, userId, file } = store;
-    if (file) {
-      ws.send(JSON.stringify({
-        type: "accept-request",
-        userId: userId,
-        target: targetId,
-        shareId: store.shareId,
-        accepted: false,
-        file: {
-          name: (file as unknown as File).name,
-          size: (file as unknown as File).size,
-          type: (file as unknown as File).type,
-        }
-      }));
-    } else {
-      alert("Please select a file")
+    const { ws, userId, file, shareId } = store;
+    if (!file) {
+      alert("Please select a file");
+      return;
     }
-
-  }
-
-
+    ws?.send(JSON.stringify({
+      type: "accept-request",
+      userId,
+      target: targetId,
+      shareId,
+      accepted: false,
+      file: {
+        name: (file as File).name,
+        size: (file as File).size,
+        type: (file as File).type,
+      }
+    }));
+  };
 
   const onAccept = async () => {
-    webrtc.fileReceiver = new LargeFileReceiver((store.file as any)?.name || "test")
-    await webrtc.fileReceiver.start()
-    receiverProgressRef.open()
-    const { ws, userId, targetId } = store;
-
-    ws.send(JSON.stringify({
+    webrtc.fileReceiver = new LargeFileReceiver((store.file as any)?.name || "test");
+    await webrtc.fileReceiver.start();
+    receiverProgressRef?.open();
+    const { ws, userId, targetId, shareId } = store;
+    ws?.send(JSON.stringify({
       type: "request-status",
-      userId: userId,
+      userId,
       target: targetId,
-      shareId: store.shareId,
+      shareId,
       status: "accepted"
     }));
-    acceotRef.close()
-  }
+    acceptRef?.close();
+  };
 
   const onDecline = () => {
-    const { ws, userId } = store;
-    ws.send(JSON.stringify({
+    const { ws, userId, shareId } = store;
+    ws?.send(JSON.stringify({
       type: "request-status",
-      userId: store.userId,
+      userId,
       target: userId,
-      shareId: store.shareId,
+      shareId,
       status: "declined"
     }));
-    acceotRef.close()
-  }
+    acceptRef?.close();
+  };
 
   return (
     <div class='container mx-auto text-center mt-2'>
       <Header store={store} setStore={setStore} />
       <div class="flex flex-auto w-full">
-        {
-          store.role === "sender" ? <div id="sender" class='w-full '>
-            <Upload setStore={setStore} store={store}><ProgressBar ref={(r: any) => userProgressRef = r} /></Upload>
+        {store.role === "sender" && (
+          <div id="sender" class='w-full'>
+            <Upload setStore={setStore} store={store}>
+              <ProgressBar ref={(r: any) => userProgressRef = r} />
+            </Upload>
             <div id="receiver-list" class='w-full container mt-4 flex flex-wrap justify-center'>
-              {
-                store.userIds.map(user => <div class='bg-slate-300 min-w-[20%] max-w-[100%]  m-4 h-10 flex justify-center items-center'><button onClick={() => onInvite(user)}>Transfer to {user}</button></div>)
-              }
-
+              {store.userIds.map(user => (
+                <div class='bg-slate-300 min-w-[20%] max-w-[100%] m-4 h-10 flex justify-center items-center'>
+                  <button onClick={() => onInvite(user)}>Transfer to {user}</button>
+                </div>
+              ))}
             </div>
-            {
-              store.userIds.length == 0 ? <div class='m-2'>Wait for user join</div> : null
-            }
+            {store.userIds.length === 0 && <div class='m-2'>Wait for user join</div>}
             <Copy text={`${location.origin}/?s=${store.shareId}`} onCopy={() => console.log('Copied!')}>
               <p class="text-gray-400">{`${location.origin}/?s=${store.shareId}`}</p>
             </Copy>
           </div>
-            : null
-        }
+        )}
       </div>
-
-      {
-        store.role === "receiver" ? <div id="receivers" class='w-full container mt-4'>
-          <Reciever file={store.file}>
+      {store.role === "receiver" && (
+        <div id="receivers" class='w-full container mt-4'>
+          <Receiver file={store.file}>
             <ProgressBar ref={(r: any) => receiverProgressRef = r} />
-          </Reciever>
-
-        </div> : null
-      }
-      <AcceptBanner ref={el => acceotRef = el} onAccept={() => onAccept()} onDecline={onDecline} user={store.targetId} />
+          </Receiver>
+        </div>
+      )}
+      <AcceptBanner ref={el => acceptRef = el} onAccept={onAccept} onDecline={onDecline} user={store.targetId} />
     </div>
   );
 };

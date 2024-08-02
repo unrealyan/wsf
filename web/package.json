@@ -5,13 +5,15 @@
   "scripts": {
     "start": "vite",
     "dev": "vite",
-    "build": "vite build",
-    "serve": "vite preview"
+    "build": "NODE_ENV=production vite build",
+    "serve": "NODE_ENV=production vite preview"
   },
   "license": "MIT",
   "devDependencies": {
+    "@types/node": "^22.0.2",
     "@types/webrtc": "0.0.43",
     "autoprefixer": "^10.4.19",
+    "dotenv": "^16.4.5",
     "postcss": "^8.4.39",
     "solid-devtools": "^0.29.2",
     "tailwindcss": "^3.4.6",

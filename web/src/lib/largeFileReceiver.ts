@@ -28,7 +28,7 @@ export default class LargeFileReceiver {
             // 创建可写流
             this.writer = await this.fileHandle.createWritable();
         } catch (err) {
-            console.error('Error starting file receiver:', err);
+            // console.error('Error starting file receiver:', err);
             // throw err;
         }
     }
