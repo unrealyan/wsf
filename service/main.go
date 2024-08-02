@@ -32,12 +32,12 @@ var (
 
 func main() {
 
-	go func() {
-		log.Printf("Main server listening on %d", MAIN_SERVER_PORT)
-		if err := http.ListenAndServe(fmt.Sprintf(":%d", MAIN_SERVER_PORT), nil); err != nil {
-			log.Fatal("ListenAndServe: ", err)
-		}
-	}()
+	// go func() {
+	// 	log.Printf("Main server listening on %d", MAIN_SERVER_PORT)
+	// 	if err := http.ListenAndServe(fmt.Sprintf(":%d", MAIN_SERVER_PORT), nil); err != nil {
+	// 		log.Fatal("ListenAndServe: ", err)
+	// 	}
+	// }()
 
 	http.HandleFunc("/ws", handleWebSocket)
 
