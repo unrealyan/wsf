@@ -171,6 +171,8 @@ export default class WebRTC implements WebRTCInterface {
                     this.lastUpdateTime = this.startTime;
                     this.lastReceivedSize = 0;
                 } else if (data === 'done') {
+                    recieveChannel.close();
+                    fileReceiver.fileInfo = fileInfo;
                     await fileReceiver.finish();
                     this.fileWriter = null;
                     console.log('File received and saved, size:', this.receivedSize);

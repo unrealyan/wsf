@@ -12,7 +12,7 @@ import Copy from './components/copy';
 
 
 
-const WEBSOCKET_URL = `wss://${location.hostname}/ws`
+const WEBSOCKET_URL = `ws://${location.hostname}:8895/ws`
 let webrtc: WebRTC
 let urlSP = new URLSearchParams(window.location.search)
 const App: Component = () => {
