@@ -2,7 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-    @apply bg-gray-100 dark:bg-neutral-900;
+@keyframes move-background {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 400px 400px;
+  }
 }
 
+body {
+  background-image: 
+    linear-gradient(to right, rgba(255,255,255,0.2) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,0.2) 1px, transparent 1px);
+  background-size: 20px 20px;
+  background-color: #0c1016;
+  animation: move-background 20s linear infinite;
+}

@@ -125,6 +125,8 @@ const App: Component = () => {
     webrtc.fileReceiver = new LargeFileReceiver((store.file as any)?.name || "test");
     await webrtc.fileReceiver.start();
     receiverProgressRef?.open();
+    receiverProgressRef.setDone(false);
+    receiverProgressRef.setValue(0)
     const { ws, userId, targetId, shareId } = store;
     ws?.send(JSON.stringify({
       type: "request-status",
