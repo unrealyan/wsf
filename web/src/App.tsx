@@ -161,8 +161,16 @@ const App: Component = () => {
             </Upload>
             <div id="receiver-list" class='w-full container mt-4 flex flex-wrap justify-center'>
               {store.userIds.map(user => (
-                <div class='bg-slate-300 min-w-[20%] max-w-[100%] m-4 h-10 flex justify-center items-center'>
-                  <button onClick={() => onInvite(user)}>Transfer to {user}</button>
+                <div class='bg-gradient-to-r from-gray-600 to-gray-900 min-w-[20%] max-w-[100%] m-4 p-0.5 rounded-lg hover:from-gray-100 hover:to-gray-600 transition duration-300'>
+                  <button 
+                    onClick={() => onInvite(user)}
+                    class='w-full h-full py-3 px-4 bg-black rounded-md flex items-center justify-center text-gray-300 hover:text-white font-medium transition duration-300'
+                  >
+                    <span class='mr-2'>Transfer to {user.toLocaleUpperCase()}</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                    </svg>
+                  </button>
                 </div>
               ))}
             </div>
