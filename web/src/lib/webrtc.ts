@@ -40,6 +40,9 @@ export default class WebRTC implements WebRTCInterface {
     private startTime: number = 0
     private lastUpdateTime: number = 0
     private lastReceivedSize: number = 0
+    private isTransferring: boolean = false;
+    private isReceiving: boolean = false;
+    private messageHandler: ((e: MessageEvent) => void) | null = null;
 
     constructor(ws: WebSocket) {
         this.servers = {
@@ -169,29 +172,43 @@ export default class WebRTC implements WebRTCInterface {
             });
 
             let fileInfo: { name: string, size: number };
-            recieveChannel.addEventListener("message", async (e) => {
+
+            const handleMessage = async (e: MessageEvent) => {
                 const { data } = e;
-                const {fileReceiver} = this
+                const { fileReceiver } = this
+
                 if (data === 'start') {
+                    if (this.isReceiving) {
+                        console.warn('Already receiving a file');
+                        return;
+                    }
+                    this.isReceiving = true;
+                    console.log("receiver start");
                     fileInfo = JSON.parse(recieveChannel.label);
                     this.receivedSize = 0;
                     this.startTime = Date.now();
                     this.lastUpdateTime = this.startTime;
                     this.lastReceivedSize = 0;
                 } else if (data === 'done') {
+                    if (this.messageHandler) {
+                        recieveChannel.removeEventListener("message", this.messageHandler);
+                        this.messageHandler = null;
+                    }
                     recieveChannel.close();
                     fileReceiver.fileInfo = fileInfo;
-                    await fileReceiver.finish();
                     this.fileWriter = null;
-                    console.log('File received and saved, size:', this.receivedSize);
+                    console.log('File received, size:', this.receivedSize);
+                    await fileReceiver.finish();
                     this.dispatch({
                         type: "fileReceived",
                         data: { name: fileInfo.name, size: this.receivedSize }
                     });
+                    this.isReceiving = false;
                 } else {
                     await fileReceiver.receiveChunk(data);
                     this.receivedSize += data.byteLength;
                     const progress = Math.ceil(this.receivedSize / (fileInfo.size / 100));
+
                     const currentTime = Date.now();
                     const elapsedTime = (currentTime - this.lastUpdateTime) / 1000; // 转换为秒
                     
@@ -215,6 +232,24 @@ export default class WebRTC implements WebRTCInterface {
                         });
                     }
                 }
+            };
+
+            // 移除旧的事件监听器（如果存在）
+            if (this.messageHandler) {
+                recieveChannel.removeEventListener("message", this.messageHandler);
+            }
+
+            // 添加新的事件监听器
+            this.messageHandler = handleMessage;
+            recieveChannel.addEventListener("message", this.messageHandler);
+
+            // 当数据通道关闭时，清理事件监听器
+            recieveChannel.addEventListener("close", () => {
+                if (this.messageHandler) {
+                    recieveChannel.removeEventListener("message", this.messageHandler);
+                    this.messageHandler = null;
+                }
+                this.isReceiving = false;
             });
         });
     };
@@ -228,7 +263,13 @@ export default class WebRTC implements WebRTCInterface {
         dataChannel = peerConnection.createDataChannel(JSON.stringify({ name: file.name, size: file.size }), options);
         dataChannel.binaryType = "arraybuffer";
 
-        dataChannel.addEventListener("open", () => {
+        const onDataChannelOpen = () => {
+            if (this.isTransferring) {
+                console.warn('Transfer already in progress');
+                return;
+            }
+            this.isTransferring = true;
+
             const chunkSize = 64 * 1024; // 64KB chunks
             let offset = 0;
             let sentSize = 0;
@@ -302,6 +343,13 @@ export default class WebRTC implements WebRTCInterface {
 
             dataChannel.send('start');
             sendNextChunk();
+        };
+
+        dataChannel.addEventListener("open", onDataChannelOpen, { once: true });
+
+        dataChannel.addEventListener("close", () => {
+            this.isTransferring = false;
+            console.log('Data channel closed');
         });
     }
 

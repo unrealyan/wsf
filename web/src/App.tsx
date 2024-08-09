@@ -1,4 +1,4 @@
-import { createEffect, onMount, type Component } from 'solid-js';
+import { createEffect, createSignal, onMount, type Component } from 'solid-js';
 import { createStore } from "solid-js/store";
 import Upload from './components/upload';
 import WebRTC from './lib/webrtc';
@@ -28,15 +28,17 @@ const App: Component = () => {
 
   let acceptRef: { open: () => void, close: () => void };
   let userProgressRef: { open: () => void, close: () => void, setValue: (value: number) => void, setSpeed: (speed: number) => void, setDone: (done: boolean) => void };
-  let receiverProgressRef: { open: () => void, setValue: (value: number) => void, setSpeed: (speed: number) => void, setDone: (done: boolean) => void };
+  let receiverProgressRef: { open: () => void, close: () => void, setValue: (value: number) => void, setSpeed: (speed: number) => void, setDone: (done: boolean) => void, status: boolean };
 
   let webrtc: WebRTC;
   let wsClient: WebSocketClient;
 
+  const [isInviting, setIsInviting] = createSignal(false);
+
   onMount(() => {
     wsClient = new WebSocketClient(userProgressRef, acceptRef);
     webrtc = new WebRTC(wsClient.ws);
-    
+
     wsClient.listen(store, setStore, webrtc);
     setStore('ws', wsClient.ws);
 
@@ -53,7 +55,7 @@ const App: Component = () => {
       };
     }
     if (!store.file) userProgressRef?.close();
-    if (acceptRef){
+    if (acceptRef) {
       wsClient.acceptRef = acceptRef;
     }
     if (userProgressRef) {
@@ -65,6 +67,7 @@ const App: Component = () => {
     const data = JSON.parse(event.data);
     if (data.type === 'file-transfer-request') {
       handleFileTransferRequest(data);
+      // receiverProgressRef
     }
     // Handle other message types as needed
   };
@@ -102,9 +105,13 @@ const App: Component = () => {
   };
 
   const onInvite = (targetId: string) => {
+    if (isInviting()) return; // 如果正在邀请中，直接返回
+    setIsInviting(true);
+
     const { ws, userId, file, shareId } = store;
     if (!file) {
-      alert("Please select a file");
+      alert("请选择一个文件");
+      setIsInviting(false);
       return;
     }
     ws?.send(JSON.stringify({
@@ -119,14 +126,19 @@ const App: Component = () => {
         type: (file as File).type,
       }
     }));
+
+    // 设置一个短暂的延迟，防止快速连续点击
+    setTimeout(() => {
+      setIsInviting(false);
+    }, 2000); // 2秒后重置状态
   };
 
   const onAccept = async () => {
     webrtc.fileReceiver = new LargeFileReceiver((store.file as any)?.name || "test");
     await webrtc.fileReceiver.start();
     receiverProgressRef?.open();
-    receiverProgressRef.setDone(false);
-    receiverProgressRef.setValue(0)
+    receiverProgressRef?.setDone(false);
+
     const { ws, userId, targetId, shareId } = store;
     ws?.send(JSON.stringify({
       type: "request-status",
@@ -136,6 +148,7 @@ const App: Component = () => {
       status: "accepted"
     }));
     acceptRef?.close();
+   
   };
 
   const onDecline = () => {
@@ -162,11 +175,12 @@ const App: Component = () => {
             <div id="receiver-list" class='w-full container mt-4 flex flex-wrap justify-center'>
               {store.userIds.map(user => (
                 <div class='bg-gradient-to-r from-gray-600 to-gray-900 min-w-[20%] max-w-[100%] m-4 p-0.5 rounded-lg hover:from-gray-100 hover:to-gray-600 transition duration-300'>
-                  <button 
+                  <button
                     onClick={() => onInvite(user)}
-                    class='w-full h-full py-3 px-4 bg-black rounded-md flex items-center justify-center text-gray-300 hover:text-white font-medium transition duration-300'
+                    disabled={isInviting()}
+                    class={`w-full h-full py-3 px-4 bg-black rounded-md flex items-center justify-center text-gray-300 hover:text-white font-medium transition duration-300 ${isInviting() ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
-                    <span class='mr-2'>Transfer to {user.toLocaleUpperCase()}</span>
+                    <span class='mr-2'>传输到 {user.toLocaleUpperCase()}</span>
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                       <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clip-rule="evenodd" />
                     </svg>

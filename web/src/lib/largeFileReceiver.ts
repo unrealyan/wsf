@@ -39,7 +39,7 @@ export default class LargeFileReceiver {
                 // throw new Error('File receiver not started');
                 this.fileDataArray.push(chunk);
                 this.receivedSize += chunk.byteLength;
-                console.log(`Received: ${this.receivedSize} bytes`);
+                // console.log(`Received: ${this.receivedSize} bytes`);
                 resolve();
             })
         }else {
@@ -47,7 +47,7 @@ export default class LargeFileReceiver {
                 // 直接将数据块写入文件
                 await this.writer.write(chunk);
                 this.receivedSize += chunk.byteLength;
-                console.log(`Received: ${this.receivedSize} bytes`);
+                // console.log(`Received: ${this.receivedSize} bytes`);
                 // 这里可以触发进度更新事件
             } catch (err) {
                 console.error('Error writing chunk:', err);
@@ -58,20 +58,16 @@ export default class LargeFileReceiver {
     }
 
     public async finish(): Promise<void> {
-        if (this.writer) {
-            try {
+        try {
+            if (this.writer && !this.writer.close) {
                 await this.writer.close();
-                console.log('File received and saved, size:', this.receivedSize);
-                // 这里可以触发文件接收完成事件
-            } catch (err) {
-                console.error('Error closing file:', err);
-                throw err;
-            } finally {
-                this.writer = null;
             }
-        } else {
-            const blob = new Blob(this.fileDataArray);
-            downloadFile(blob, this.fileInfo.name);
+            console.log('File saved successfully');
+        } catch (err) {
+            console.error('Error closing file:', err);
+        } finally {
+            this.writer = null;
+            this.receivedSize = 0
         }
     }
 }
@@ -85,23 +81,3 @@ const downloadFile = (blob: Blob, fileName: string) => {
     window.URL.revokeObjectURL(url);
     a.remove();
 };
-
-// 使用示例
-async function handleFileTransfer(dataChannel: RTCDataChannel, fileName: string): Promise<void> {
-    const receiver = new LargeFileReceiver(fileName);
-
-    try {
-        await receiver.start();
-
-        dataChannel.addEventListener('message', async (event: MessageEvent) => {
-            if (event.data === 'done') {
-                await receiver.finish();
-                console.log('File transfer completed');
-            } else {
-                await receiver.receiveChunk(event.data);
-            }
-        });
-    } catch (err) {
-        console.error('File transfer failed:', err);
-    }
-}

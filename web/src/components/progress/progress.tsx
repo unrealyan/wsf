@@ -38,6 +38,7 @@ const ProgressBar: (props: ProgressBarProps) => JSX.Element = (props) => {
         }, 1350); // Slightly longer than the total animation duration
     }
     props.ref({
+        status:status,
         open: () => setStatus(true),
         close: () => setStatus(false),
         setValue: (val: number) => setProgress(val),
@@ -45,37 +46,49 @@ const ProgressBar: (props: ProgressBarProps) => JSX.Element = (props) => {
         setDone:(val:boolean) => setDone(val)
     })
 
-    createEffect(() => {
-        const currentProgress = progress();
-        if (currentProgress > lastProgress()) {
-            for (let i = lastProgress(); i < currentProgress; i++) {
-                createPacket();
-            }
-            setLastProgress(currentProgress);
-        }
-    });
+    // createEffect(() => {
+    //     const currentProgress = progress();
+    //     if (currentProgress > lastProgress()) {
+    //         for (let i = lastProgress(); i < currentProgress; i++) {
+    //             createPacket();
+    //         }
+    //         setLastProgress(currentProgress);
+    //     }
+    // });
 
 
     return (
         <>
-            {
-                status() ? <div id="progress-container">
-                    <div class="progress-container">
-                        <div class="endpoint endpoint-left">A</div>
-                        <div class="endpoint endpoint-right">B</div>
-                        <div class="progress-text">{progress()}% 
-                        {done() ? <span class='ml-4 text-blue-400'>Done</span> :<span class='text-blue-400'>{speed()}</span>}
-                        </div>
-                        <For each={packets()}>
-                            {(packet) => (
-                                <div
-                                    class={`packet ${packet.active ? 'active' : ''}`}
-                                />
-                            )}
-                        </For>
+            {status() && (
+                <div id="progress-container" class="bg-white p-4 rounded-lg shadow-md border border-gray-200">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="font-semibold text-lg text-gray-800">progress</span>
+                        <span class="text-gray-600">{speed()}</span>
                     </div>
-                </div> : null
-            }
+                    <div class="relative pt-1">
+                        <div class="flex mb-2 items-center justify-between">
+                            <div>
+                                <span class="text-xs font-semibold inline-block py-1 px-2 rounded-full text-gray-800 bg-gray-200">
+                                    {progress()}%
+                                </span>
+                            </div>
+                            {done() && (
+                                <div class="text-right">
+                                    <span class="text-xs font-semibold inline-block text-gray-600">
+                                        Done
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                        <div class="overflow-hidden h-2 mb-4 text-xs flex rounded bg-gray-200">
+                            <div
+                                style={`width: ${progress()}%`}
+                                class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-gray-600 transition-all duration-500"
+                            ></div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 };
