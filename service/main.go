@@ -3,9 +3,11 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"sync"
+	"time"
 
 	"math/rand"
 
@@ -28,22 +30,82 @@ var (
 			return true
 		},
 	}
+
+	stats      Statistics
+	statsMutex sync.Mutex
+	statsFile  = "stats.json"
 )
 
-func main() {
+type Statistics struct {
+	TotalFiles int64 `json:"totalFiles"`
+	TotalSize  int64 `json:"totalSize"`
+}
 
-	// go func() {
-	// 	log.Printf("Main server listening on %d", MAIN_SERVER_PORT)
-	// 	if err := http.ListenAndServe(fmt.Sprintf(":%d", MAIN_SERVER_PORT), nil); err != nil {
-	// 		log.Fatal("ListenAndServe: ", err)
-	// 	}
-	// }()
+func main() {
+	loadStats()
 
 	http.HandleFunc("/ws", handleWebSocket)
+
+	go broadcastStats()
 
 	log.Printf("WebSocket server listening on %d", WEBSOCKET_SERVER_PORT)
 	if err := http.ListenAndServe(fmt.Sprintf(":%d", WEBSOCKET_SERVER_PORT), nil); err != nil {
 		log.Fatal("ListenAndServe: ", err)
+	}
+}
+
+func loadStats() {
+	data, err := ioutil.ReadFile(statsFile)
+	if err != nil {
+		log.Println("无法读取统计文件，使用默认值")
+		return
+	}
+	err = json.Unmarshal(data, &stats)
+	if err != nil {
+		log.Println("解析统计文件失败，使用默认值")
+	}
+}
+
+func saveStats() {
+	data, err := json.Marshal(stats)
+	if err != nil {
+		log.Println("序列化统计数据失败:", err)
+		return
+	}
+	err = ioutil.WriteFile(statsFile, data, 0644)
+	if err != nil {
+		log.Println("保存统计数据失败:", err)
+	}
+}
+
+func updateStats(fileSize int64) {
+	statsMutex.Lock()
+	defer statsMutex.Unlock()
+
+	stats.TotalFiles++
+	stats.TotalSize += fileSize
+	saveStats()
+}
+
+func broadcastStats() {
+	ticker := time.NewTicker(5 * time.Second)
+	for range ticker.C {
+		statsMutex.Lock()
+		statsMsg := map[string]interface{}{
+			"type":       "stats",
+			"totalFiles": stats.TotalFiles,
+			"totalSize":  stats.TotalSize,
+		}
+		statsJSON, _ := json.Marshal(statsMsg)
+		statsMutex.Unlock()
+
+		connMutex.Lock()
+		for _, userConns := range connections {
+			for _, conn := range userConns {
+				conn.WriteMessage(websocket.TextMessage, statsJSON)
+			}
+		}
+		connMutex.Unlock()
 	}
 }
 
@@ -77,6 +139,15 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		"userId":  userId,
 		"shareId": shareId,
 	})
+
+	// 发送初始统计数据
+	statsMutex.Lock()
+	conn.WriteJSON(map[string]interface{}{
+		"type":       "stats",
+		"totalFiles": stats.TotalFiles,
+		"totalSize":  stats.TotalSize,
+	})
+	statsMutex.Unlock()
 
 	for {
 		_, msg, err := conn.ReadMessage()
@@ -136,7 +207,16 @@ func handleMessage(shareId, userId string, msg []byte) {
 		if conn, ok := connections[shareId][target]; ok {
 			conn.WriteJSON(data)
 		}
+
+		if data["type"] == "request-status" {
+			if data["status"] == "accepted" {
+				if size, ok := data["size"].(float64); ok {
+					updateStats(int64(size))
+				}
+			}
+		}
 		connMutex.Unlock()
+
 	}
 }
 

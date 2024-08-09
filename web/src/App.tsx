@@ -9,6 +9,7 @@ import ProgressBar from "./components/progress/progress";
 import Receiver from './boards/reciever';
 import Copy from './components/copy';
 import WebSocketClient, { StoreType } from './lib/webSocket';
+import StatisticsManager from './components/statisticsManager'
 
 const urlSP = new URLSearchParams(window.location.search);
 
@@ -23,7 +24,9 @@ const App: Component = () => {
     progress: 0,
     fileStream: null,
     ws: null,
-    role: urlSP.get("s") ? "receiver" : "sender"
+    role: urlSP.get("s") ? "receiver" : "sender",
+    totalFiles:0,
+    totalSize:0
   });
 
   let acceptRef: { open: () => void, close: () => void };
@@ -162,7 +165,8 @@ const App: Component = () => {
       userId,
       target: targetId,
       shareId,
-      status: "accepted"
+      status: "accepted",
+      size: store.file?.size
     }));
     acceptRef?.close();
    
@@ -220,6 +224,7 @@ const App: Component = () => {
         </div>
       )}
       <AcceptBanner ref={el => acceptRef = el} onAccept={onAccept} onDecline={onDecline} user={store.targetId} />
+      <StatisticsManager totalSize={store.totalSize} totalFiles={store.totalFiles}/>
     </div>
   );
 };

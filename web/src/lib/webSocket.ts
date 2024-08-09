@@ -12,6 +12,8 @@ export interface StoreType {
     fileStream: Promise<any> | null;
     ws: WebSocket | null;
     role: "sender" | "receiver";
+    totalFiles:number,
+    totalSize:number
 }
 
 const urlSP = new URLSearchParams(window.location.search);
@@ -142,6 +144,13 @@ export default class WebSocketClient {
                         type: data.fileType
                     });
                     this.acceptRef.open();
+                    break;
+
+                case "stats":
+                    setStore({
+                        totalSize:data.totalSize,
+                        totalFiles:data.totalFiles
+                    })
                     break;
             }
         };
