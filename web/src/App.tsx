@@ -116,17 +116,17 @@ const App: Component = () => {
   };
 
   const onInvite = (targetId: string) => {
-    if (isInviting()) return; // 如果正在邀请中，直接返回
+    if (isInviting()) return; // If already inviting, return
     setIsInviting(true);
 
     const { ws, userId, file, shareId } = store;
     if (!file) {
-      alert("请选择一个文件");
+      alert("Please select a file");
       setIsInviting(false);
       return;
     }
 
-    // 重置进度条状态
+    // Reset progress bar status
     userProgressRef?.setDone(false);
     userProgressRef?.setValue(0);
     userProgressRef?.setSpeed(0);
@@ -144,10 +144,10 @@ const App: Component = () => {
       }
     }));
 
-    // 设置一个短暂的延迟，防止快速连续点击
+    // Set a short delay to prevent rapid consecutive clicks
     setTimeout(() => {
       setIsInviting(false);
-    }, 2000); // 2秒后重置状态
+    }, 2000); // Reset status after 2 seconds
   };
 
   const onAccept = async () => {
@@ -197,7 +197,7 @@ const App: Component = () => {
                     disabled={isInviting()}
                     class={`w-full h-full py-3 px-4 bg-black rounded-md flex items-center justify-center text-gray-300 hover:text-white font-medium transition duration-300 ${isInviting() ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
-                    <span class='mr-2'>传输到 {user.toLocaleUpperCase()}</span>
+                    <span class='mr-2'>Transfer to {user.toLocaleUpperCase()}</span>
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                       <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clip-rule="evenodd" />
                     </svg>
