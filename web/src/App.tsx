@@ -88,6 +88,8 @@ const App: Component = () => {
       updateProgress(e.data, e.speed);
     } else if (e.type === "fileReceived") {
       setProgressDone();
+    } else if (e.type === "transferStart") {
+      resetProgress();
     }
   };
 
@@ -96,6 +98,15 @@ const App: Component = () => {
     userProgressRef?.setSpeed(speed);
     receiverProgressRef?.setValue(value);
     receiverProgressRef?.setSpeed(speed);
+  };
+
+  const resetProgress = () => {
+    userProgressRef?.setDone(false);
+    userProgressRef?.setValue(0);
+    userProgressRef?.setSpeed(0);
+    receiverProgressRef?.setDone(false);
+    receiverProgressRef?.setValue(0);
+    receiverProgressRef?.setSpeed(0);
   };
 
   const setProgressDone = () => {
@@ -114,6 +125,12 @@ const App: Component = () => {
       setIsInviting(false);
       return;
     }
+
+    // 重置进度条状态
+    userProgressRef?.setDone(false);
+    userProgressRef?.setValue(0);
+    userProgressRef?.setSpeed(0);
+
     ws?.send(JSON.stringify({
       type: "accept-request",
       userId,

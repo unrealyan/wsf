@@ -270,6 +270,12 @@ export default class WebRTC implements WebRTCInterface {
             }
             this.isTransferring = true;
 
+            // 通知传输开始
+            this.dispatch({
+                type: "transferStart",
+                data: null
+            });
+
             const chunkSize = 64 * 1024; // 64KB chunks
             let offset = 0;
             let sentSize = 0;
