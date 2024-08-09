@@ -47,7 +47,7 @@ export default class LargeFileReceiver {
                 // 直接将数据块写入文件
                 await this.writer.write(chunk);
                 this.receivedSize += chunk.byteLength;
-                // console.log(`Received: ${this.receivedSize} bytes`);
+                console.log(`Received: ${this.receivedSize} bytes`);
                 // 这里可以触发进度更新事件
             } catch (err) {
                 console.error('Error writing chunk:', err);
@@ -58,16 +58,20 @@ export default class LargeFileReceiver {
     }
 
     public async finish(): Promise<void> {
-        try {
-            if (this.writer && !this.writer.close) {
+        if (this.writer) {
+            try {
                 await this.writer.close();
+                console.log('File received and saved, size:', this.receivedSize);
+                // 这里可以触发文件接收完成事件
+            } catch (err) {
+                console.error('Error closing file:', err);
+                throw err;
+            } finally {
+                this.writer = null;
             }
-            console.log('File saved successfully');
-        } catch (err) {
-            console.error('Error closing file:', err);
-        } finally {
-            this.writer = null;
-            this.receivedSize = 0
+        } else {
+            const blob = new Blob(this.fileDataArray);
+            downloadFile(blob, this.fileInfo.name);
         }
     }
 }
