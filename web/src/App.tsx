@@ -169,11 +169,11 @@ const App: Component = () => {
   };
 
   const onDecline = () => {
-    const { ws, userId, shareId } = store;
+    const { ws, userId, shareId,targetId } = store;
     ws?.send(JSON.stringify({
       type: "request-status",
       userId,
-      target: userId,
+      target: targetId,
       shareId,
       status: "declined"
     }));
