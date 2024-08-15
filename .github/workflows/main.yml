@@ -28,7 +28,7 @@ jobs:
     - name: Compress dist folder
       run: |
         cd web
-        tar -czf ../websf.tar.gz -C dist .
+        sudo tar -czf ../websf.tar.gz -C dist .
 
     - name: Deploy to Server
       uses: appleboy/scp-action@master
@@ -48,7 +48,7 @@ jobs:
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
           cd /usr/share/nginx/html/
-          rm -rf websf
-          mkdir websf
-          tar -xzf websf.tar.gz -C websf
-          rm websf.tar.gz
+          sudo m -rf websf
+          sudo mkdir websf
+          sudo tar -xzf websf.tar.gz -C websf
+          sudo rm websf.tar.gz
