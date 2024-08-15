@@ -14,17 +14,21 @@ jobs:
       uses: actions/setup-node@v2
       with:
         node-version: '16'
-    - name: Install dependencies
-      run: cd web
 
-    - name: Install dependencies
-      run: npm install
+    - name: Set working directory and install dependencies
+      run: |
+        cd web
+        npm install
 
     - name: Build project
-      run: npm run build
+      run: |
+        cd web
+        npm run build
 
     - name: Compress dist folder
-      run: tar -czf websf.tar.gz -C dist .
+      run: |
+        cd web
+        tar -czf ../websf.tar.gz -C dist .
 
     - name: Deploy to Server
       uses: appleboy/scp-action@master
