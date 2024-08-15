@@ -28,7 +28,7 @@ jobs:
     - name: Compress dist folder
       run: |
         cd web
-        sudo tar -czf ../websf.tar.gz -C dist .
+        tar -czf ../websf.tar.gz -C dist .
 
     - name: Deploy to Server
       uses: appleboy/scp-action@master
@@ -37,18 +37,19 @@ jobs:
         username: ${{ secrets.USERNAME }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         source: "websf.tar.gz"
-        target: "/usr/share/nginx/html/"
+        target: "/tmp/"
         overwrite: true
 
-    - name: Extract files on server
+    - name: Extract files on server and move to nginx directory
       uses: appleboy/ssh-action@master
       with:
         host: ${{ secrets.HOST }}
         username: ${{ secrets.USERNAME }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
-          cd /usr/share/nginx/html/
-          sudo m -rf websf
-          sudo mkdir websf
-          sudo tar -xzf websf.tar.gz -C websf
-          sudo rm websf.tar.gz
+          sudo rm -rf /usr/share/nginx/html/websf
+          sudo mkdir -p /usr/share/nginx/html/websf
+          sudo tar -xzf /tmp/websf.tar.gz -C /usr/share/nginx/html/websf
+          sudo rm /tmp/websf.tar.gz
+          sudo chown -R nginx:nginx /usr/share/nginx/html/websf
+          sudo chmod -R 755 /usr/share/nginx/html/websf
