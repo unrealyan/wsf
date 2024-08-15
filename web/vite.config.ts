@@ -14,6 +14,7 @@ console.log(process.env.NODE_ENV);
 console.log(JSON.stringify(env));
 
 export default defineConfig({
+  publicDir: 'src/assets',
   plugins: [
     /* 
     Uncomment the following line to enable solid-devtools.
