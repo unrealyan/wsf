@@ -13,7 +13,7 @@ export default function Avatar(props: AvatarProps) {
 
   return (
     <div 
-      class="avatar mt-4 md:flex items-center justify-center rounded-full overflow-hidden text-white bg-black relative "
+      class="avatar mt-4 flex items-center justify-center rounded-full overflow-hidden text-white bg-black relative "
       style={{ 
         width: `${size}px`, 
         height: `${size}px`,
