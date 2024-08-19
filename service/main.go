@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -72,7 +73,7 @@ func saveStats() {
 		log.Println("序列化统计数据失败:", err)
 		return
 	}
-	err = ioutil.WriteFile(statsFile, data, 0644)
+	err = os.WriteFile(statsFile, data, 0644)
 	if err != nil {
 		log.Println("保存统计数据失败:", err)
 	}
