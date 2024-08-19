@@ -209,7 +209,7 @@ const App: Component = () => {
                 </div>
               ))}
             </div>
-            {store.userIds.length === 0 && <div class='m-2'>Wait for user join</div>}
+            {store.userIds.length === 0 && <div class='m-2 text-white'>Wait for user join</div>}
             <Copy text={`${location.origin}/?s=${store.shareId}`} onCopy={() => console.log('Copied!')}>
               <p class="text-gray-400">{`${location.origin}/?s=${store.shareId}`}</p>
             </Copy>

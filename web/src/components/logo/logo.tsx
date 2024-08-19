@@ -7,7 +7,7 @@ export default function Logo() {
                 <path d="M12 2L2 7v10l10 5 10-5V7L12 2zm0 18.5L4 16v-7l8 4 8-4v7l-8 4.5z" fill="currentColor" />
                 <circle cx="12" cy="12" r="3" fill="currentColor" />
             </svg>
-            <div class="site-name">RTCFS</div>
+            <div class="site-name dark:text-white">RTCFS</div>
         </div>
     )
 }
