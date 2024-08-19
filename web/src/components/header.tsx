@@ -7,7 +7,7 @@ export default function Header(props: { store: any, setStore: any }) {
             <div class="px-4 md:px-0 flex justify-between items-center">
 
                 <div>
-                    <a class="flex-none rounded-md text-xl inline-block font-semibold focus:outline-none focus:opacity-80" href="../templates/personal/index.html" aria-label="Preline">
+                    <a class="flex-none rounded-md text-xl inline-block font-semibold focus:outline-none focus:opacity-80" href="/" aria-label="Preline">
                         <Logo />
                     </a>
                 </div>
