@@ -185,9 +185,21 @@ const App: Component = () => {
   };
 
   return (
-    <div class='container mx-auto text-center mt-2'>
+    <div class='container mx-auto mt-2 px-4 sm:px-6 lg:px-8'>
       <Header store={store} setStore={setStore} />
-      <div class="flex flex-auto w-full">
+      <div class="desc bg-gradient-to-r from-gray-800 to-gray-900 rounded-lg shadow-lg p-4 mb-6 text-left mt-8 w-[90%] m-auto">
+        <h2 class="text-lg font-semibold mb-2 text-white">About WSF</h2>
+        <p class="text-sm text-gray-300 mb-3">
+          WSF is an open-source, secure P2P file transfer tool using WebRTC. No server storage, direct device-to-device transfer.
+        </p>
+        <h3 class="text-base font-medium mb-2 text-white">How to use:</h3>
+        <ol class="list-decimal list-inside text-sm text-gray-300 space-y-1">
+          <li>Share the link below with the recipient</li>
+          <li>Wait for connection</li>
+          <li>Select and send your file</li>
+        </ol>
+      </div>
+      <div class="flex flex-auto w-full text-center">
         {store.role === "sender" && (
           <div id="sender" class='w-full'>
             <Upload setStore={setStore} store={store}>
@@ -209,7 +221,7 @@ const App: Component = () => {
                 </div>
               ))}
             </div>
-            {store.userIds.length === 0 && <div class='m-2 text-white'>Wait for user join</div>}
+            {store.userIds.length === 0 && <div class='m-2 text-white text-center'>Wait for user join</div>}
             <Copy text={`${location.origin}/?s=${store.shareId}`} onCopy={() => console.log('Copied!')}>
               <p class="text-gray-400">{`${location.origin}/?s=${store.shareId}`}</p>
             </Copy>
