@@ -187,7 +187,7 @@ const App: Component = () => {
   return (
     <div class='container mx-auto mt-2 px-4 sm:px-6 lg:px-8'>
       <Header store={store} setStore={setStore} />
-      <div class="desc bg-gradient-to-r from-gray-800 to-gray-900 rounded-lg shadow-lg p-4 mb-6 text-left mt-8 w-[90%] m-auto">
+      <div class="desc hidden md:block bg-gradient-to-r from-gray-800 to-gray-900 rounded-lg shadow-lg p-4 mb-6 text-left mt-8 w-[90%] m-auto">
         <h2 class="text-lg font-semibold mb-2 text-white">About WSF</h2>
         <p class="text-sm text-gray-300 mb-3">
           WSF is an open-source, secure P2P file transfer tool using WebRTC. No server storage, direct device-to-device transfer.
