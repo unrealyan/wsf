@@ -3,11 +3,11 @@ stages:
   - deploy
 
 variables:
-  GO_VERSION: "1.20"
+  GO_VERSION: "1.21.13"
 
 build:
   stage: build
-  image: golang:1.20-bullseye
+  image: golang:1.21.13-bullseye
   before_script:
     - apt-get update && apt-get install -y gcc-aarch64-linux-gnu
   script:
