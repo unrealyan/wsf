@@ -1,0 +1,32 @@
+stages:
+  - build
+  - deploy
+
+variables:
+  GO_VERSION: "1.20"
+
+build:
+  stage: build
+  image: redhat/ubi8:latest
+  before_script:
+    - dnf install -y golang
+  script:
+    - go version
+    - CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o websf
+  artifacts:
+    paths:
+      - websf
+
+deploy:
+  stage: deploy
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache openssh-client
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+  script:
+    - scp -o StrictHostKeyChecking=no websf $REMOTE_USER@$REMOTE_HOST:$REMOTE_PATH
+  only:
+    - hey
