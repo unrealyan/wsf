@@ -12,7 +12,8 @@ build:
     - dnf install -y golang
   script:
     - go version
-    - CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o websf
+    - cd service
+    - CGO_ENABLED=1 GOOS=linux GOARCH=arm64 go build -o ../websf
   artifacts:
     paths:
       - websf
@@ -27,6 +28,6 @@ deploy:
     - mkdir -p ~/.ssh
     - chmod 700 ~/.ssh
   script:
-    - scp -o StrictHostKeyChecking=no websf $REMOTE_USER@$REMOTE_HOST:/tmp
+    - scp -o StrictHostKeyChecking=no websf $REMOTE_USER@$REMOTE_HOST:$REMOTE_PATH
   only:
     - hey
