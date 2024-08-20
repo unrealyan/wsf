@@ -128,6 +128,11 @@ const App: Component = () => {
       setIsInviting(false);
       return;
     }
+    if (file.size ==0) {
+      alert("The selected file 0 size");
+      setIsInviting(false);
+      return;
+    }
 
     // Reset progress bar status
     userProgressRef?.setDone(false);
@@ -166,6 +171,7 @@ const App: Component = () => {
       target: targetId,
       shareId,
       status: "accepted",
+      filename: store.file?.name,
       size: store.file?.size
     }));
     acceptRef?.close();
