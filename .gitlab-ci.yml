@@ -27,6 +27,6 @@ deploy:
     - mkdir -p ~/.ssh
     - chmod 700 ~/.ssh
   script:
-    - scp -o StrictHostKeyChecking=no websf $REMOTE_USER@$REMOTE_HOST:$REMOTE_PATH
+    - scp -o StrictHostKeyChecking=no websf $REMOTE_USER@$REMOTE_HOST:/tmp
   only:
     - hey
