@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"sync"
@@ -12,8 +13,11 @@ import (
 
 	"math/rand"
 
+	"database/sql"
+
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 const (
@@ -42,8 +46,24 @@ type Statistics struct {
 	TotalSize  int64 `json:"totalSize"`
 }
 
+type UploadRecord struct {
+	SenderID    string
+	SenderIP    string
+	Filename    string
+	Filesize    int64
+	SendTime    time.Time
+	ReceiverID  string
+	ReceiverIP  string
+	ReceiveTime time.Time
+}
+
+var db *sql.DB
+
 func main() {
 	loadStats()
+
+	initDB()
+	defer db.Close()
 
 	http.HandleFunc("/ws", handleWebSocket)
 
@@ -213,6 +233,23 @@ func handleMessage(shareId, userId string, msg []byte) {
 			if data["status"] == "accepted" {
 				if size, ok := data["size"].(float64); ok {
 					updateStats(int64(size))
+
+					// 记录上传信息
+					filename, _ := data["filename"].(string)
+					senderIP := getIP(connections[shareId][userId].RemoteAddr())
+					receiverIP := getIP(connections[shareId][target].RemoteAddr())
+					sendTime := time.Now()
+
+					go recordUpload(UploadRecord{
+						SenderID:    userId,
+						SenderIP:    senderIP,
+						Filename:    filename,
+						Filesize:    int64(size),
+						SendTime:    sendTime,
+						ReceiverID:  target,
+						ReceiverIP:  receiverIP,
+						ReceiveTime: sendTime, // 暂时设置为相同时间，后续可以更新
+					})
 				}
 			}
 		}
@@ -245,4 +282,45 @@ func removeElement(slice []string, element string) []string {
 		}
 	}
 	return slice
+}
+
+func initDB() {
+	var err error
+	db, err = sql.Open("sqlite3", "uploads.db")
+	if err != nil {
+		log.Fatal("打开数据库失败:", err)
+	}
+
+	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS uploads (
+		sender_id TEXT,
+		sender_ip TEXT,
+		filename TEXT,
+		filesize INTEGER,
+		send_time DATETIME,
+		receiver_id TEXT,
+		receiver_ip TEXT,
+		receive_time DATETIME
+	)`)
+	if err != nil {
+		log.Fatal("创建表失败:", err)
+	}
+}
+
+func recordUpload(record UploadRecord) {
+	_, err := db.Exec(`INSERT INTO uploads 
+		(sender_id, sender_ip, filename, filesize, send_time, receiver_id, receiver_ip, receive_time) 
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		record.SenderID, record.SenderIP, record.Filename, record.Filesize,
+		record.SendTime, record.ReceiverID, record.ReceiverIP, record.ReceiveTime)
+
+	if err != nil {
+		log.Println("记录上传信息失败:", err)
+	}
+}
+
+func getIP(addr net.Addr) string {
+	if tcpAddr, ok := addr.(*net.TCPAddr); ok {
+		return tcpAddr.IP.String()
+	}
+	return ""
 }
