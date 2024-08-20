@@ -24,10 +24,15 @@ deploy:
   before_script:
     - apk add --no-cache openssh-client
     - eval $(ssh-agent -s)
-    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    - echo "正在添加 SSH 私钥..."
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add - || (echo "SSH 私钥添加失败" && exit 1)
+    - echo "SSH 私钥添加成功"
     - mkdir -p ~/.ssh
     - chmod 700 ~/.ssh
+    - echo "StrictHostKeyChecking no" >> ~/.ssh/config
   script:
-    - scp -o StrictHostKeyChecking=no websf $REMOTE_USER@$REMOTE_HOST:$REMOTE_PATH
+    - echo "开始 SCP 传输..."
+    - scp -v websf $REMOTE_USER@$REMOTE_HOST:$REMOTE_PATH || (echo "SCP 传输失败" && exit 1)
+    - echo "SCP 传输成功"
   only:
     - hey
