@@ -17,7 +17,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 const (
@@ -286,7 +286,7 @@ func removeElement(slice []string, element string) []string {
 
 func initDB() {
 	var err error
-	db, err = sql.Open("sqlite3", "uploads.db")
+	db, err = sql.Open("sqlite", "/var/lib/websf/uploads.db")
 	if err != nil {
 		log.Fatal("打开数据库失败:", err)
 	}
