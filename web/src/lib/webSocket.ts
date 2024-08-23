@@ -1,10 +1,13 @@
 import { WebRTCInterface } from "./webrtc";
 import { createStore, type SetStoreFunction, type Store } from "solid-js/store";
+import { User } from "../boards/userlist";
+import { ActionType, StateType, useStore } from "./store";
 
 export interface StoreType {
     userId: string;
     targetId: string;
     userIds: string[];
+    userList: User[];
     file: null | File | { name: string; size: number; type: string };
     shareId: string;
     searchParam: URLSearchParams;
@@ -12,13 +15,15 @@ export interface StoreType {
     fileStream: Promise<any> | null;
     ws: WebSocket | null;
     role: "sender" | "receiver";
-    totalFiles:number,
-    totalSize:number
+    totalFiles: number,
+    totalSize: number
 }
 
 const urlSP = new URLSearchParams(window.location.search);
 const WEBSOCKET_URL = process.env.WEBSOCKET_URL || "";
 const uuidRegex = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+
+
 
 export default class WebSocketClient {
     ws!: WebSocket;
@@ -30,6 +35,7 @@ export default class WebSocketClient {
         setDone: (done: boolean) => void;
     };
     acceptRef: { open: () => void; close: () => void };
+
 
     constructor(
         userProgressRef: {
@@ -61,6 +67,7 @@ export default class WebSocketClient {
         }
 
         this.connect(wsUrl.toString());
+
     }
 
     connect(url: string) {
@@ -72,38 +79,66 @@ export default class WebSocketClient {
         };
     }
 
-    listen(store: Store<StoreType>, setStore: SetStoreFunction<StoreType>, webrtc: WebRTCInterface) {
+    join() {
+
+    }
+
+    listen(state: StateType, action: ActionType, webrtc: WebRTCInterface) {
         if (!this.ws) {
             throw new Error("WebSocket not initialized");
         }
 
         this.ws.onmessage = (e) => {
             let data = JSON.parse(e.data);
-
             switch (data.type) {
                 case "user-id":
-                    setStore("userId", data.userId);
+                    action.setUserId(data.userId);
                     if (data.shareId) {
                         sessionStorage.setItem("shareId", data.shareId);
-                        setStore("shareId", data.shareId);
+                        action.setShareId(data.shareId);
                     }
-
                     this.ws.send(JSON.stringify({
-                        type: store.searchParam.get("s") ? "receiver" : "sender",
+                        type: state.searchParam.get("s") ? "receiver" : "sender",
                         userId: data.userId
                     }));
                     break;
-
                 case "all-receivers":
-                    setStore("userIds", data.userIds || []);
+                    // action.setUserIds(data.userIds || []); // 使用 action 更新 userIds
+                    action.setUserList(data.userIds.map((id: string) => ({
+                        id,
+                        filename: "",
+                        progress: 0,
+                        speed: 0,
+                        start: false
+                    }))); // 使用 action 更新 userList
                     break;
 
                 case "join":
-                    webrtc.createOffer(data.target, store, setStore);
+                    state.userList.forEach(user=>{
+                    webrtc.createOffer().then(offer => {
+                        console.log(state)
+                        this.ws.send(JSON.stringify({
+                            name: state.userId,
+                            target: user.id,
+                            type: "offer",
+                            sdp: offer
+                        }));
+                    });
+                })
                     break;
 
                 case "offer":
-                    webrtc.createAnswer(data.name, data.sdp, setStore);
+                    state.userList.forEach(user=>{
+                        webrtc.createAnswer().then(answer => {
+                            this.ws.send(JSON.stringify({
+                                name: state.userId,
+                                target: user.id,
+                                type: "answer",
+                                sdp: answer
+                            }));
+                        });
+                    })
+                    
                     break;
 
                 case "answer":
@@ -120,37 +155,33 @@ export default class WebSocketClient {
                         this.userProgressRef.open();
                         this.ws.send(JSON.stringify({
                             type: "initiate",
-                            userId: store.userId,
-                            shareId: store.shareId,
+                            userId: state.userId,
+                            shareId: state.shareId,
                             target: data.userId
                         }));
                     }
                     break;
 
                 case "accept-request":
-                    setStore({
-                        file: data.file,
-                        targetId: data.userId
-                    });
+                    action.setFile(data.file); // 使用 action 更新 file
+                    action.setTargetId(data.userId); // 使用 action 更新 targetId
                     console.log(this.acceptRef)
                     this.acceptRef.open();
                     break;
 
                 case "file-transfer-request":
-                    setStore('targetId', data.senderId);
-                    setStore('file', {
+                    action.setTargetId(data.senderId); // 使用 action 更新 targetId
+                    action.setFile({
                         name: data.fileName,
                         size: data.fileSize,
                         type: data.fileType
-                    });
+                    }); // 使用 action 更新 file
                     this.acceptRef.open();
                     break;
 
                 case "stats":
-                    setStore({
-                        totalSize:data.totalSize,
-                        totalFiles:data.totalFiles
-                    })
+                    action.setTotalSize(data.totalSize); // 使用 action 更新 totalSize
+                    action.setTotalFiles(data.totalFiles); // 使用 action 更新 totalFiles
                     break;
             }
         };

@@ -1,5 +1,6 @@
 /* @refresh reload */
 import { render } from 'solid-js/web';
+import StoreProvider from './lib/store'
 
 import './index.css';
 import App from './App';
@@ -12,4 +13,4 @@ if (import.meta.env.DEV && !(root instanceof HTMLElement)) {
   );
 }
 
-render(() => <App />, root!);
+render(() => <StoreProvider><App /></StoreProvider>, root!);

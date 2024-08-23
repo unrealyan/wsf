@@ -1,5 +1,8 @@
+import { resolve } from "path"
 import { formatBytes } from "./fileUtil"
 import LargeFileReceiver from "./largeFileReceiver"
+import { ActionType, StateType } from "./store"
+import { rejects } from "assert"
 
 export interface WebRTCInterface {
     peerConnection: RTCPeerConnection
@@ -7,14 +10,15 @@ export interface WebRTCInterface {
     servers: { iceServers: { urls: string[] }[] }
     ws: WebSocket
     userId: string
-    file: File
+    file: File | null
     fileReceiver: LargeFileReceiver
-    createPeerConnection: (targetUserId: string, sender: boolean, store: any) => void
-    createOffer: (targetUserId: string, store: any, setStore: any) => void
-    createAnswer: (targetUserId: string, offer: RTCSessionDescriptionInit, setStore: any) => void
+    // createPeerConnection: (targetUserId: string, sender: boolean, store: any) => void
+    createOffer: () => Promise<any>
+    createAnswer: () => Promise<any>
+    // createAnswer: (targetUserId: string, offer: RTCSessionDescriptionInit, setStore: any) => void
     addAnswer: (answer: RTCSessionDescriptionInit) => void
     addIceCandidates: (candidate?: RTCIceCandidateInit) => void
-    downloadFile: (blob: Blob, fileName: string) => void
+    // downloadFile: (blob: Blob, fileName: string) => void
 }
 
 interface ProgressEvent {
@@ -101,37 +105,29 @@ export default class WebRTC implements WebRTCInterface {
         }
     }
 
-    createOffer = async (targetUserId: string, store: any, setStore: any) => {
-        this.file = store.file
-        this.userId = store.userId
-        let { createPeerConnection, peerConnection, ws, userId } = this
-        createPeerConnection(targetUserId, true, store);
-
-        let offer = await peerConnection.createOffer();
-        console.log("created-offer");
-        await peerConnection.setLocalDescription(offer);
-        ws.send(JSON.stringify({
-            name: userId,
-            target: targetUserId,
-            type: "offer",
-            sdp: offer
-        }));
+    createOffer = async () =>{   
+        try {
+            await this.listenPeerConnection()
+            let offer = await this.peerConnection.createOffer();
+            await this.peerConnection.setLocalDescription(offer);
+            return Promise.resolve(offer)
+        } catch (error) {
+            return  Promise.reject(error)
+        }
     }
 
-    createAnswer = async (targetUserId: string, offer: RTCSessionDescriptionInit, setStore: any) => {
-        let { createPeerConnection, peerConnection, ws, userId } = this
-        createPeerConnection(targetUserId, false, setStore);
-        await peerConnection.setRemoteDescription(offer).catch((e) => console.log(e));
-
-        let answer = await peerConnection.createAnswer();
-        console.log("created-answer");
-        await peerConnection.setLocalDescription(answer);
-        ws.send(JSON.stringify({
-            name: userId,
-            target: targetUserId,
-            type: "answer",
-            sdp: answer
-        }));
+    createAnswer = async () =>{   
+        try {
+            await this.listenPeerConnection()
+            let offer = await this.peerConnection.createOffer();
+            await this.peerConnection.setRemoteDescription(offer);
+            let answer = await this.peerConnection.createAnswer();
+            console.log("created-answer");
+            await this.peerConnection.setLocalDescription(answer);
+            return Promise.resolve(answer)
+        } catch (error) {
+            return  Promise.reject(error)
+        }
     }
 
     addAnswer = async (answer: RTCSessionDescriptionInit) => {
@@ -148,111 +144,20 @@ export default class WebRTC implements WebRTCInterface {
         console.log("counterpart's-ice-candidates-added");
     };
 
-    createPeerConnection = (targetUserId: string, sender = false, store: any) => {
-        let { peerConnection, recieveChannel, ws, openDataChannel } = this
+
+    listenPeerConnection = async (sender=false)=>{
         this.peerConnection.addEventListener("icecandidate", (e) => {
             if (e.candidate) {
-                ws.send(JSON.stringify({
-                    type: "new-ice-candidate",
-                    target: targetUserId,
-                    candidate: e.candidate
-                }));
+                this.dispatch({
+                    type:"icecandidate"
+                })
             }
         });
 
         if (sender) {
-            openDataChannel();
+            this.openDataChannel();
         }
-
-        peerConnection.addEventListener("datachannel", (e) => {
-            recieveChannel = e.channel;
-
-            recieveChannel.addEventListener("error", (err) => {
-                console.log("Error:", err);
-            });
-
-            let fileInfo: { name: string, size: number };
-
-            const handleMessage = async (e: MessageEvent) => {
-                const { data } = e;
-                const { fileReceiver } = this
-
-                if (data === 'start') {
-                    if (this.isReceiving) {
-                        console.warn('Already receiving a file');
-                        return;
-                    }
-                    this.isReceiving = true;
-                    console.log("receiver start");
-                    fileInfo = JSON.parse(recieveChannel.label);
-                    this.receivedSize = 0;
-                    this.startTime = Date.now();
-                    this.lastUpdateTime = this.startTime;
-                    this.lastReceivedSize = 0;
-                } else if (data === 'done') {
-                    if (this.messageHandler) {
-                        recieveChannel.removeEventListener("message", this.messageHandler);
-                        this.messageHandler = null;
-                    }
-                    recieveChannel.close();
-                    fileReceiver.fileInfo = fileInfo;
-                    this.fileWriter = null;
-                    console.log('File received, size:', this.receivedSize);
-                    await fileReceiver.finish();
-                    this.dispatch({
-                        type: "fileReceived",
-                        data: { name: fileInfo.name, size: this.receivedSize }
-                    });
-                    this.isReceiving = false;
-                } else {
-                    await fileReceiver.receiveChunk(data);
-                    this.receivedSize += data.byteLength;
-                    const progress = Math.ceil(this.receivedSize / (fileInfo.size / 100));
-
-                    const currentTime = Date.now();
-                    const elapsedTime = (currentTime - this.lastUpdateTime) / 1000; // 转换为秒
-                    
-                    if (elapsedTime >= 1) { // 每秒更新一次速度
-                        const speed = (this.receivedSize - this.lastReceivedSize) / elapsedTime;
-                        this.dispatch({
-                            type: "progress",
-                            user:"receiver",
-                            data: progress,
-                            speed: formatBytes(speed)+"/s"
-                        });
-                        this.lastUpdateTime = currentTime;
-                        this.lastReceivedSize = this.receivedSize;
-                    } else {
-                        const speed = (this.receivedSize - this.lastReceivedSize) / elapsedTime;
-                        this.dispatch({
-                            type: "progress",
-                            user:"receiver",
-                            data: progress,
-                            speed: formatBytes(speed)+"/s"
-                        });
-                    }
-                }
-            };
-
-            // 移除旧的事件监听器（如果存在）
-            if (this.messageHandler) {
-                recieveChannel.removeEventListener("message", this.messageHandler);
-            }
-
-            // 添加新的事件监听器
-            this.messageHandler = handleMessage;
-            recieveChannel.addEventListener("message", this.messageHandler);
-
-            // 当数据通道关闭时，清理事件监听器
-            recieveChannel.addEventListener("close", () => {
-                if (this.messageHandler) {
-                    recieveChannel.removeEventListener("message", this.messageHandler);
-                    this.messageHandler = null;
-                }
-                this.isReceiving = false;
-            });
-        });
-    };
+    }
 
     openDataChannel = () => {
         let { peerConnection, dataChannel, file } = this
@@ -359,25 +264,5 @@ export default class WebRTC implements WebRTCInterface {
         });
     }
 
-    downloadFile = (blob: Blob, fileName: string) => {
-        const a = document.createElement('a');
-        const url = window.URL.createObjectURL(blob);
-        a.href = url;
-        a.download = fileName;
-        a.click();
-        window.URL.revokeObjectURL(url);
-        a.remove();
-    };
-
-    async createWritableStream(fileName: string) {
-        try {
-            const handle = await (window as any).showSaveFilePicker({
-                suggestedName: fileName,
-            });
-            return await handle.createWritable();
-        } catch (err) {
-            console.error('Error creating writable stream:', err);
-            throw err;
-        }
-    }
+   
 }

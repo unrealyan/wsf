@@ -286,7 +286,7 @@ func removeElement(slice []string, element string) []string {
 
 func initDB() {
 	var err error
-	db, err = sql.Open("sqlite", "/var/lib/websf/uploads.db")
+	db, err = sql.Open("sqlite", "uploads.db")
 	if err != nil {
 		log.Fatal("打开数据库失败:", err)
 	}

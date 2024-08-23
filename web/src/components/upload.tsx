@@ -1,7 +1,9 @@
 import { createEffect, onMount } from "solid-js"
 import { formatBytes } from "../lib/fileUtil";
+import { useStore } from "../lib/store";
 
 function Upload(props: any) {
+    const [state,action] = useStore()
     let drapRef: HTMLDivElement
 
     createEffect(() => {
@@ -15,6 +17,11 @@ function Upload(props: any) {
     const change = (event: any) => {
         let files = event.currentTarget.files
         props.setStore("file", () => files[0])
+        action.setFile(files[0])
+        action.setUserList(state.userList.map(user=>{
+            let nuser = {...user,filename:files[0].name}
+            return nuser
+        }))
     }
 
     const dragStart = (event: any) => {
@@ -38,7 +45,16 @@ function Upload(props: any) {
                 if (item.kind === "file") {
                     const file = item.getAsFile();
                     console.log(`… file[${i}].name = ${file.name}`);
-                    props.setStore("file", () => file)
+                    // props.setStore("file", () => file)
+                    props.setStore({
+                        ...props.store,
+                        file,
+                        userList:props.store.map((user:any)=>{
+                            user.filename=file.name
+                            return user
+                        })
+
+                    })
                 }
             });
 

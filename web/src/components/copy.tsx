@@ -22,7 +22,7 @@ const Copy: (props: CopyProps) => JSXElement = (props) => {
   });
 
   return (
-    <div class="copy-container flex justify-center m-2">
+    <div class="copy-container flex justify-center m-4">
       {props.children}
       <button class="copy-button text-blue-400 ml-4" onClick={handleCopy}>
         {isCopied() ? 'Copied' : 'Copy'}
