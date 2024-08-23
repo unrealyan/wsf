@@ -146,6 +146,7 @@ export default class WebRTC implements WebRTCInterface {
 
 
     listenPeerConnection = async (sender=false)=>{
+        let { peerConnection, recieveChannel, ws, openDataChannel } = this
         this.peerConnection.addEventListener("icecandidate", (e) => {
             if (e.candidate) {
                 this.dispatch({
@@ -157,6 +158,94 @@ export default class WebRTC implements WebRTCInterface {
         if (sender) {
             this.openDataChannel();
         }
+        peerConnection.addEventListener("datachannel", (e) => {
+            recieveChannel = e.channel;
+
+            recieveChannel.addEventListener("error", (err) => {
+                console.log("Error:", err);
+            });
+
+            let fileInfo: { name: string, size: number };
+
+            const handleMessage = async (e: MessageEvent) => {
+                const { data } = e;
+                const { fileReceiver } = this
+
+                if (data === 'start') {
+                    if (this.isReceiving) {
+                        console.warn('Already receiving a file');
+                        return;
+                    }
+                    this.isReceiving = true;
+                    console.log("receiver start");
+                    fileInfo = JSON.parse(recieveChannel.label);
+                    this.receivedSize = 0;
+                    this.startTime = Date.now();
+                    this.lastUpdateTime = this.startTime;
+                    this.lastReceivedSize = 0;
+                } else if (data === 'done') {
+                    if (this.messageHandler) {
+                        recieveChannel.removeEventListener("message", this.messageHandler);
+                        this.messageHandler = null;
+                    }
+                    recieveChannel.close();
+                    fileReceiver.fileInfo = fileInfo;
+                    this.fileWriter = null;
+                    console.log('File received, size:', this.receivedSize);
+                    await fileReceiver.finish();
+                    this.dispatch({
+                        type: "fileReceived",
+                        data: { name: fileInfo.name, size: this.receivedSize }
+                    });
+                    this.isReceiving = false;
+                } else {
+                    await fileReceiver.receiveChunk(data);
+                    this.receivedSize += data.byteLength;
+                    const progress = Math.ceil(this.receivedSize / (fileInfo.size / 100));
+
+                    const currentTime = Date.now();
+                    const elapsedTime = (currentTime - this.lastUpdateTime) / 1000; // 转换为秒
+                    
+                    if (elapsedTime >= 1) { // 每秒更新一次速度
+                        const speed = (this.receivedSize - this.lastReceivedSize) / elapsedTime;
+                        this.dispatch({
+                            type: "progress",
+                            user:"receiver",
+                            data: progress,
+                            speed: formatBytes(speed)+"/s"
+                        });
+                        this.lastUpdateTime = currentTime;
+                        this.lastReceivedSize = this.receivedSize;
+                    } else {
+                        const speed = (this.receivedSize - this.lastReceivedSize) / elapsedTime;
+                        this.dispatch({
+                            type: "progress",
+                            user:"receiver",
+                            data: progress,
+                            speed: formatBytes(speed)+"/s"
+                        });
+                    }
+                }
+            };
+
+            // 移除旧的事件监听器（如果存在）
+            if (this.messageHandler) {
+                recieveChannel.removeEventListener("message", this.messageHandler);
+            }
+
+            // 添加新的事件监听器
+            this.messageHandler = handleMessage;
+            recieveChannel.addEventListener("message", this.messageHandler);
+
+            // 当数据通道关闭时，清理事件监听器
+            recieveChannel.addEventListener("close", () => {
+                if (this.messageHandler) {
+                    recieveChannel.removeEventListener("message", this.messageHandler);
+                    this.messageHandler = null;
+                }
+                this.isReceiving = false;
+            });
+        });
     }
 
     openDataChannel = () => {
