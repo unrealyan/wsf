@@ -60,10 +60,11 @@ const App: Component = () => {
       action.setRole(urlSP.get("s") ? "receiver" : "sender")
     })
     wsClient = new WebSocketClient(userProgressRef, acceptRef);
-    webrtc = new WebRTC(wsClient.ws);
+    // webrtc = new WebRTC(wsClient.ws);
+    webrtc = new WebRTC();
 
     // wsClient.listen(store, setStore, webrtc);
-    wsClient.listen(state, action, webrtc);
+    wsClient.listen(state, action);
     setStore('ws', wsClient.ws);
     action.setWebSocket(wsClient.ws)
 
@@ -185,7 +186,7 @@ const App: Component = () => {
   };
 
   const onAccept = async () => {
-    webrtc.fileReceiver = new LargeFileReceiver((store.file as any)?.name || "test");
+    webrtc.fileReceiver = new LargeFileReceiver((store.file as any)?.name || state.file?.name|| "test");
     await webrtc.fileReceiver.start();
     receiverProgressRef?.open();
     receiverProgressRef?.setDone(false);

@@ -1,7 +1,8 @@
-import { WebRTCInterface } from "./webrtc";
+import WebRTCImpl,{ WebRTCInterface } from "./webrtc";
 import { createStore, type SetStoreFunction, type Store } from "solid-js/store";
 import { User } from "../boards/userlist";
 import { ActionType, StateType, useStore } from "./store";
+import { Console } from "console";
 
 export interface StoreType {
     userId: string;
@@ -83,7 +84,7 @@ export default class WebSocketClient {
 
     }
 
-    listen(state: StateType, action: ActionType, webrtc: WebRTCInterface) {
+    listen(state: StateType, action: ActionType) {
         if (!this.ws) {
             throw new Error("WebSocket not initialized");
         }
@@ -106,16 +107,18 @@ export default class WebSocketClient {
                     // action.setUserIds(data.userIds || []); // 使用 action 更新 userIds
                     action.setUserList(data.userIds.map((id: string) => ({
                         id,
-                        filename: "",
-                        progress: 0,
+                        filename: state.file?.name,
+                        progress: 1,
                         speed: 0,
-                        start: false
+                        start: false,
+                        webrtc: new WebRTCImpl()
                     }))); // 使用 action 更新 userList
                     break;
 
                 case "join":
+                    console.log("state.userList")
                     state.userList.forEach(user=>{
-                    webrtc.createOffer().then(offer => {
+                    user.webrtc?.createOffer().then(offer => {
                         console.log(state)
                         this.ws.send(JSON.stringify({
                             name: state.userId,
@@ -129,7 +132,7 @@ export default class WebSocketClient {
 
                 case "offer":
                     state.userList.forEach(user=>{
-                        webrtc.createAnswer().then(answer => {
+                        user.webrtc?.createAnswer().then(answer => {
                             this.ws.send(JSON.stringify({
                                 name: state.userId,
                                 target: user.id,
@@ -142,12 +145,19 @@ export default class WebSocketClient {
                     break;
 
                 case "answer":
-                    webrtc.addAnswer(data.sdp);
+                    state.userList.forEach(user=>{
+                        user.webrtc?.addAnswer(data.sdp);
+                    })
+                
                     break;
 
                 case "new-ice-candidate":
-                    const candidate = new RTCIceCandidate(data.candidate);
-                    webrtc.addIceCandidates(candidate);
+                   
+                    state.userList.forEach(user=>{
+                        const candidate = new RTCIceCandidate(data.candidate);
+                        user.webrtc?.addIceCandidates(candidate);
+                    })
+                   
                     break;
 
                 case "request-status":

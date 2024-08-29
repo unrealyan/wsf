@@ -8,7 +8,7 @@ export interface WebRTCInterface {
     peerConnection: RTCPeerConnection
     dataChannel: RTCDataChannel
     servers: { iceServers: { urls: string[] }[] }
-    ws: WebSocket
+    // ws: WebSocket
     userId: string
     file: File | null
     fileReceiver: LargeFileReceiver
@@ -27,13 +27,13 @@ interface ProgressEvent {
     speed?: number; // 传输速度 (bytes/second)
 }
 
-export default class WebRTC implements WebRTCInterface {
+export default class WebRTCImpl implements WebRTCInterface {
     peerConnection!: RTCPeerConnection
     recieveChannel!: RTCDataChannel
     dataChannel!: RTCDataChannel
     iceServers!: RTCIceServer[]
     servers: { iceServers:  any}
-    ws: WebSocket;
+    // ws: WebSocket;
     userId!: string
     file!: File
     fileReceiver: LargeFileReceiver
@@ -48,7 +48,7 @@ export default class WebRTC implements WebRTCInterface {
     private isReceiving: boolean = false;
     private messageHandler: ((e: MessageEvent) => void) | null = null;
 
-    constructor(ws: WebSocket) {
+    constructor() {
         this.servers = {
             iceServers: [
                 {
@@ -79,9 +79,9 @@ export default class WebRTC implements WebRTCInterface {
             this.dispatch('Connection state:' + this.peerConnection.connectionState)
             console.log('Connection state:', this.peerConnection.connectionState);
         });
-        this.ws = ws;
+        // this.ws = ws;
         this._onmessage = (event: any) => { }
-        this.fileReceiver = new LargeFileReceiver("test")
+        this.fileReceiver = new LargeFileReceiver("test2")
     }
 
     get onmessage() {
@@ -146,7 +146,7 @@ export default class WebRTC implements WebRTCInterface {
 
 
     listenPeerConnection = async (sender=false)=>{
-        let { peerConnection, recieveChannel, ws, openDataChannel } = this
+        let { peerConnection, recieveChannel } = this
         this.peerConnection.addEventListener("icecandidate", (e) => {
             if (e.candidate) {
                 this.dispatch({

@@ -78,7 +78,7 @@ export default function StoreProvider(props: any) {
     setState(prev => ({ ...prev, ...newState }));
   };
 
-  const store: StoreType = [
+  const store: StoreType = [ 
     state,
     {
       setUserId: (id: string) => setState('userId', id),

@@ -1,6 +1,6 @@
 import { createEffect, createSignal, For } from "solid-js";
 import UserItem from "../components/userItem";
-import WebRTC from '../lib/webrtc';
+import WebRTCImpl from '../lib/webrtc';
 import { createStore } from "solid-js/store";
 import WebSocketClient, { StoreType } from "../lib/webSocket";
 import { useStore } from "../lib/store";
@@ -15,7 +15,7 @@ export interface User {
     progress: number;
     speed: number;
     start: boolean;
-    webrtc?: WebRTC | null
+    webrtc?: WebRTCImpl | null
 }
 interface UserListStore {
     userList: User[]
@@ -57,7 +57,7 @@ export default function UserListContainer(props: UserListContainerProps) {
         const isUserListChanged = JSON.stringify(state.userList) !== JSON.stringify(userlist);
 
 
-        if (isUserListChanged) {
+        if (isUserListChanged && state.file?.name) {
             // setStore("userList", userlist);
             action.setUserList(userlist)
             onInvite()
