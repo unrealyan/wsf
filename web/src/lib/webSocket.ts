@@ -131,16 +131,16 @@ export default class WebSocketClient {
                     break;
 
                 case "offer":
-                    state.userList.forEach(user=>{
-                        user.webrtc?.createAnswer().then(answer => {
-                            this.ws.send(JSON.stringify({
-                                name: state.userId,
-                                target: user.id,
-                                type: "answer",
-                                sdp: answer
-                            }));
-                        });
-                    })
+                    state.reciever.webrtc?.createAnswer().then(answer => {
+                        this.ws.send(JSON.stringify({
+                            name: state.userId,
+                            target: state.targetId,
+                            type: "answer",
+                            sdp: answer
+                        }));
+                    },err=>{
+                        console.log(err)
+                    });
                     
                     break;
 

@@ -1,6 +1,6 @@
 import { createStore } from 'solid-js/store';
 import { createContext, useContext } from 'solid-js';
-import WebRTC from './webrtc';
+import WebRTCImpl from './webrtc';
 
 export interface User {
     id: string;
@@ -8,7 +8,7 @@ export interface User {
     progress: number;
     speed: number;
     start: boolean;
-    webrtc?: WebRTC | null
+    webrtc?: WebRTCImpl | null
 }
 // 定义 Store 的类型
 export interface StateType {
@@ -26,6 +26,7 @@ export interface StateType {
   role: "sender" | "receiver";
   totalFiles: number;
   totalSize: number;
+  reciever:User;
 }
 
 export interface ActionType {
@@ -44,6 +45,7 @@ export interface ActionType {
   setRole: (role: "sender" | "receiver") => void;
   setTotalFiles: (total: number) => void;
   setTotalSize: (size: number) => void;
+  setReciver:(user:User)=>void;
   updateState: (newState: Partial<StateType>) => void;
 }
 
@@ -71,7 +73,14 @@ export default function StoreProvider(props: any) {
     ws: null,
     role: "sender", // 或 "receiver"
     totalFiles: 0,
-    totalSize: 0
+    totalSize: 0,
+    reciever:{
+      id: "",
+      filename: '',
+      progress: 0,
+      speed: 0,
+      start: false
+    }
   });
 
   const updateState = (newState: Partial<StateType>) => {
@@ -86,7 +95,7 @@ export default function StoreProvider(props: any) {
       setTargetId: (id: string) => setState('targetId', id),
       addUserId: (id: string) => setState('userIds', ids => [...ids, id]),
       removeUserId: (id: string) => setState('userIds', ids => ids.filter(uid => uid !== id)),
-      setUserList: (list: User[]) => setState('userList', list),
+      setUserList: (list: User[]) => setState('userList',[...list]),
       setFile: (file: File | { name: string; size: number; type: string } | null) => setState('file', file),
       setShareId: (id: string) => setState('shareId', id),
       setSearchParam: (params: URLSearchParams) => setState('searchParam', params),
@@ -96,6 +105,7 @@ export default function StoreProvider(props: any) {
       setRole: (role: "sender" | "receiver") => setState('role', role),
       setTotalFiles: (total: number) => setState('totalFiles', total),
       setTotalSize: (size: number) => setState('totalSize', size),
+      setReciver:(user:User)=>setState('reciever',user),
       updateState: updateState,
     }
   ];

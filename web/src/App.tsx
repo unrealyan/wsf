@@ -1,4 +1,4 @@
-import { createEffect, createSignal, onMount, Show, type Component,batch } from 'solid-js';
+import { createEffect, createSignal, onMount, Show, type Component, batch } from 'solid-js';
 import { createStore } from "solid-js/store";
 import Upload from './components/upload';
 import WebRTC from './lib/webrtc';
@@ -10,40 +10,41 @@ import Receiver from './boards/reciever';
 import Copy from './components/copy';
 import WebSocketClient from './lib/webSocket';
 import StatisticsManager from './components/statisticsManager';
-import UserListContainer,{User} from './boards/userlist';
+import UserListContainer, { User } from './boards/userlist';
 import Desc from './components/desc';
-import { useStore ,StateType,StoreType} from './lib/store';
+import { useStore, StateType, StoreType } from './lib/store';
+import WebRTCImpl from './lib/webrtc';
 
 
 
 const urlSP = new URLSearchParams(window.location.search);
 
 interface SendFile {
-  name:string;
-  size:number;
-  type:string;
+  name: string;
+  size: number;
+  type: string;
 }
 const App: Component = () => {
-  const [state,action]:StoreType = useStore();
+  const [state, action]: StoreType = useStore();
 
   console.log(state)
 
-  const [store, setStore] = createStore<StateType>({
-    userId: "",
-    userType:"",
-    targetId: "",
-    userIds: [],
-    userList:[],
-    file: null,
-    shareId: "",
-    searchParam: urlSP,
-    progress: 0,
-    fileStream: null,
-    ws: null,
-    role: urlSP.get("s") ? "receiver" : "sender",
-    totalFiles: 0,
-    totalSize: 0
-  });
+  // const [store, setStore] = createStore<StateType>({
+  //   userId: "",
+  //   userType:"",
+  //   targetId: "",
+  //   userIds: [],
+  //   userList:[],
+  //   file: null,
+  //   shareId: "",
+  //   searchParam: urlSP,
+  //   progress: 0,
+  //   fileStream: null,
+  //   ws: null,
+  //   role: urlSP.get("s") ? "receiver" : "sender",
+  //   totalFiles: 0,
+  //   totalSize: 0
+  // });
 
   let acceptRef: { open: () => void, close: () => void };
   let userProgressRef: { open: () => void, close: () => void, setValue: (value: number) => void, setSpeed: (speed: number) => void, setDone: (done: boolean) => void };
@@ -55,7 +56,7 @@ const App: Component = () => {
   const [isInviting, setIsInviting] = createSignal(false);
 
   onMount(() => {
-    batch(()=>{
+    batch(() => {
       action.setSearchParam(urlSP)
       action.setRole(urlSP.get("s") ? "receiver" : "sender")
     })
@@ -65,7 +66,7 @@ const App: Component = () => {
 
     // wsClient.listen(store, setStore, webrtc);
     wsClient.listen(state, action);
-    setStore('ws', wsClient.ws);
+    // setStore('ws', wsClient.ws);
     action.setWebSocket(wsClient.ws)
 
     wsClient.ws.addEventListener('message', handleWebSocketMessage);
@@ -102,18 +103,24 @@ const App: Component = () => {
 
   const handleFileTransferRequest = (data: any) => {
     action.setTargetId(data.senderId)
-    setStore('targetId', data.senderId);
-    setStore('file', {
+    action.setFile({
       name: data.fileName,
       size: data.fileSize,
       type: data.fileType
-    });
+    })
+    // setStore('targetId', data.senderId);
+    // setStore('file', {
+    //   name: data.fileName,
+    //   size: data.fileSize,
+    //   type: data.fileType
+    // });
     acceptRef?.open();
   };
 
   const handleWebRTCMessage = (e: any) => {
     if (e.type === "progress") {
-      setStore("progress", e.data);
+      // setStore("progress", e.data);
+      action.setProgress(e.data)
       updateProgress(e.data, e.speed);
     } else if (e.type === "fileReceived") {
       setProgressDone();
@@ -149,7 +156,7 @@ const App: Component = () => {
     if (isInviting()) return; // If already inviting, return
     setIsInviting(true);
 
-    const { ws, userId, file, shareId } = store;
+    const { ws, userId, file, shareId } = state;
     if (!file) {
       alert("Please select a file");
       setIsInviting(false);
@@ -186,8 +193,26 @@ const App: Component = () => {
   };
 
   const onAccept = async () => {
-    webrtc.fileReceiver = new LargeFileReceiver((store.file as any)?.name || state.file?.name|| "test");
-    await webrtc.fileReceiver.start();
+    let reciverWebrtc = new WebRTCImpl();
+    reciverWebrtc.fileReceiver = new LargeFileReceiver(state.file?.name || "test")
+    // reciverWebrtc.onmessage = (e: any) => {
+    //   console.log(e)
+    //   if (e.type == "icecandidate") {
+    //     state.ws?.send(JSON.stringify({
+    //       type: "new-ice-candidate",
+    //       target: state.userId,
+    //       candidate: e.candidate
+    //     }));
+    //   }
+    // }
+    action.setReciver({
+      ...state.reciever,
+      filename: state.file?.name || "",
+      webrtc: reciverWebrtc
+    })
+
+    // webrtc.fileReceiver = new LargeFileReceiver(state.file?.name|| "test");
+    await reciverWebrtc.fileReceiver.start();
     receiverProgressRef?.open();
     receiverProgressRef?.setDone(false);
 
@@ -206,7 +231,7 @@ const App: Component = () => {
   };
 
   const onDecline = () => {
-    const { ws, userId, shareId, targetId } = store;
+    const { ws, userId, shareId, targetId } = state;
     ws?.send(JSON.stringify({
       type: "request-status",
       userId,
@@ -220,14 +245,14 @@ const App: Component = () => {
   return (
     <div class='container mx-auto mt-2 px-4 sm:px-4 lg:px-4'>
 
-      <Header store={store} setStore={setStore} />
+      <Header />
       <div class={`main flex`}>
-        <div class={`${store.userIds.length > 0 ? 'w-[70%]' : 'w-full'}`}>
+        <div class={`${state.userIds.length > 0 ? 'w-[70%]' : 'w-full'}`}>
           <Desc />
           <div class="flex flex-auto w-full text-center">
-            {store.role === "sender" && (
+            {state.role === "sender" && (
               <div id="sender" class='w-full'>
-                <Upload setStore={setStore} store={store}>
+                <Upload >
                   <ProgressBar ref={(r: any) => userProgressRef = r} />
                 </Upload>
                 {/* <div id="receiver-list" class='w-full container mt-4 flex flex-wrap justify-center'>
@@ -253,7 +278,7 @@ const App: Component = () => {
         </div>
         <Show when={state.userList.length > 0}>
           <div class={`sider w-[30%] overflow`}>
-            <UserListContainer userList={state.userList} store={store}/>
+            <UserListContainer userList={state.userList} />
           </div>
         </Show>
 
@@ -264,8 +289,14 @@ const App: Component = () => {
         <p class="text-gray-400">{`${location.origin}/?s=${state.shareId}`}</p>
       </Copy>
 
-
-      <AcceptBanner ref={el => acceptRef = el} onAccept={onAccept} onDecline={onDecline} user={store.targetId} />
+      {state.role === "receiver" && (
+        <div id="receivers" class='w-full container mt-4'>
+          <Receiver file={state.file}>
+            <ProgressBar ref={(r: any) => receiverProgressRef = r} />
+          </Receiver>
+        </div>
+      )}
+      <AcceptBanner ref={el => acceptRef = el} onAccept={onAccept} onDecline={onDecline} user={state.targetId} />
       <StatisticsManager totalSize={state.totalSize} totalFiles={state.totalFiles} />
     </div>
   );

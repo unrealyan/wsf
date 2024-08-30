@@ -71,6 +71,7 @@ export default class WebRTCImpl implements WebRTCInterface {
         this.peerConnection = new RTCPeerConnection(this.servers);
         this.peerConnection.oniceconnectionstatechange = e => console.log(this.peerConnection.iceConnectionState);
         this.peerConnection.onicecandidate = event => {
+            console.log(event)
             if (event.candidate) {
                 console.log("New ICE candidate: " + JSON.stringify(event.candidate));
             }
@@ -110,8 +111,10 @@ export default class WebRTCImpl implements WebRTCInterface {
             await this.listenPeerConnection()
             let offer = await this.peerConnection.createOffer();
             await this.peerConnection.setLocalDescription(offer);
+            console.log("Offer created and set as local description.");
             return Promise.resolve(offer)
         } catch (error) {
+             console.error("Error creating offer:", error);
             return  Promise.reject(error)
         }
     }
@@ -122,10 +125,11 @@ export default class WebRTCImpl implements WebRTCInterface {
             let offer = await this.peerConnection.createOffer();
             await this.peerConnection.setRemoteDescription(offer);
             let answer = await this.peerConnection.createAnswer();
-            console.log("created-answer");
             await this.peerConnection.setLocalDescription(answer);
+            console.log("created-answer");
             return Promise.resolve(answer)
         } catch (error) {
+            console.log("error",error)
             return  Promise.reject(error)
         }
     }
@@ -147,10 +151,11 @@ export default class WebRTCImpl implements WebRTCInterface {
 
     listenPeerConnection = async (sender=false)=>{
         let { peerConnection, recieveChannel } = this
-        this.peerConnection.addEventListener("icecandidate", (e) => {
+        peerConnection.addEventListener("icecandidate", (e) => {
             if (e.candidate) {
                 this.dispatch({
-                    type:"icecandidate"
+                    type:"icecandidate",
+                    candidate: e.candidate
                 })
             }
         });

@@ -2,7 +2,7 @@ import { useStore } from '../lib/store';
 import Avatar from './avatar/avatar';
 import Logo from './logo/logo';
 
-export default function Header(props: { store: any, setStore: any }) {
+export default function Header() {
     const [state] = useStore()
 
     return <header class="sticky top-0 inset-x-0 flex flex-wrap items-center md:justify-start md:items-center md:flex-nowrap z-50 w-full md:w-[90%] m-auto text-sm">

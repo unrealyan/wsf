@@ -7,7 +7,7 @@ import { useStore } from "../lib/store";
 
 interface UserListContainerProps {
     userList: User[];
-    store: StoreType;
+    // store: StoreType;
 }
 export interface User {
     id: string;
@@ -34,11 +34,8 @@ export default function UserListContainer(props: UserListContainerProps) {
             if (!storeUser) {
                 console.log(state.file)
                 return {
-                    id: user.id,
+                    ...user,
                     filename: state.file?.name || "",
-                    progress: 0,
-                    speed: 0,
-                    start: false
                 };
             }
             return storeUser; // 返回已存在的用户
