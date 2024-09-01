@@ -13,6 +13,16 @@ interface ProgressBarProps {
     ref:any
 }
 
+export interface UserProgressRef {
+    status: () => boolean;
+    open: () => void;
+    close: () => void;
+    setValue: (val: number) => void;
+    setSpeed: (val: string) => void;
+    setDone: (val: boolean) => void;
+  }
+  
+
 const ProgressBar: (props: ProgressBarProps) => JSX.Element = (props) => {
     const [packets, setPackets] = createSignal<Packet[]>([]);
     const [lastProgress, setLastProgress] = createSignal(0);

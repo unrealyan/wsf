@@ -62,7 +62,7 @@ export default function UserListContainer(props: UserListContainerProps) {
         }
     }, [props.userList, state.file?.name]);
 
-
+console.log(console.log(props.userList))
 
     const onInvite = () => {
         console.log("oninvite")

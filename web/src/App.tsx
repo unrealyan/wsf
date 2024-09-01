@@ -12,9 +12,12 @@ import WebSocketClient from './lib/webSocket';
 import StatisticsManager from './components/statisticsManager';
 import UserListContainer, { User } from './boards/userlist';
 import Desc from './components/desc';
-import { useStore, StateType, StoreType } from './lib/store';
+import { useStore, StateType, StoreType,IReceiver,StoreManager } from './lib/store';
 import WebRTCImpl from './lib/webrtc';
-
+import Sender from './boards/sender'
+import { WebRTCReceiver } from './lib/mywebrtc';
+import { MyWebSocket } from './lib/mywebSocket';
+import eventManager,{ EventManager } from './lib/eventManager';
 
 
 const urlSP = new URLSearchParams(window.location.search);
@@ -46,12 +49,12 @@ const App: Component = () => {
   //   totalSize: 0
   // });
 
-  let acceptRef: { open: () => void, close: () => void };
-  let userProgressRef: { open: () => void, close: () => void, setValue: (value: number) => void, setSpeed: (speed: number) => void, setDone: (done: boolean) => void };
-  let receiverProgressRef: { open: () => void, close: () => void, setValue: (value: number) => void, setSpeed: (speed: number) => void, setDone: (done: boolean) => void, status: boolean };
+  // let acceptRef: { open: () => void, close: () => void };
+  // let userProgressRef: { open: () => void, close: () => void, setValue: (value: number) => void, setSpeed: (speed: number) => void, setDone: (done: boolean) => void };
+  // let receiverProgressRef: { open: () => void, close: () => void, setValue: (value: number) => void, setSpeed: (speed: number) => void, setDone: (done: boolean) => void, status: boolean };
 
-  let webrtc: WebRTC;
-  let wsClient: WebSocketClient;
+  // let webrtc: WebRTC;
+  // let wsClient: WebSocketClient;
 
   const [isInviting, setIsInviting] = createSignal(false);
 
@@ -60,188 +63,192 @@ const App: Component = () => {
       action.setSearchParam(urlSP)
       action.setRole(urlSP.get("s") ? "receiver" : "sender")
     })
-    wsClient = new WebSocketClient(userProgressRef, acceptRef);
+    // wsClient = new WebSocketClient(userProgressRef, acceptRef);
     // webrtc = new WebRTC(wsClient.ws);
-    webrtc = new WebRTC();
+    // webrtc = new WebRTC();
 
-    // wsClient.listen(store, setStore, webrtc);
-    wsClient.listen(state, action);
-    // setStore('ws', wsClient.ws);
-    action.setWebSocket(wsClient.ws)
+    // // wsClient.listen(store, setStore, webrtc);
+    // wsClient.listen(state, action);
+    // // setStore('ws', wsClient.ws);
+    let wsClient = new MyWebSocket()
+    wsClient.onmessage()
+    action.setWebSocket(wsClient)
+    new StoreManager({state,action})
 
-    wsClient.ws.addEventListener('message', handleWebSocketMessage);
+
+    // wsClient.ws.addEventListener('message', handleWebSocketMessage);
   });
 
 
-  createEffect(() => {
+  // createEffect(() => {
 
-    if (webrtc) {
-      webrtc.onmessage = handleWebRTCMessage;
-    }
-    if (state.ws) {
-      state.ws.onclose = () => {
-        console.log("WebSocket connection closed...")
-      };
-    }
-    if (!state.file) userProgressRef?.close();
-    if (acceptRef) {
-      wsClient.acceptRef = acceptRef;
-    }
-    if (userProgressRef) {
-      wsClient.userProgressRef = userProgressRef;
-    }
-  });
+  //   if (webrtc) {
+  //     webrtc.onmessage = handleWebRTCMessage;
+  //   }
+  //   if (state.ws) {
+  //     state.ws.ws?.onclose = () => {
+  //       console.log("WebSocket connection closed...")
+  //     };
+  //   }
+  //   if (!state.file) userProgressRef?.close();
+  //   if (acceptRef) {
+  //     wsClient.acceptRef = acceptRef;
+  //   }
+  //   if (userProgressRef) {
+  //     wsClient.userProgressRef = userProgressRef;
+  //   }
+  // });
 
-  const handleWebSocketMessage = (event: MessageEvent) => {
-    const data = JSON.parse(event.data);
-    if (data.type === 'file-transfer-request') {
-      handleFileTransferRequest(data);
-      // receiverProgressRef
-    }
-    // Handle other message types as needed
-  };
+  // const handleWebSocketMessage = (event: MessageEvent) => {
+  //   const data = JSON.parse(event.data);
+  //   if (data.type === 'file-transfer-request') {
+  //     handleFileTransferRequest(data);
+  //     // receiverProgressRef
+  //   }
+  //   // Handle other message types as needed
+  // };
 
-  const handleFileTransferRequest = (data: any) => {
-    action.setTargetId(data.senderId)
-    action.setFile({
-      name: data.fileName,
-      size: data.fileSize,
-      type: data.fileType
-    })
-    // setStore('targetId', data.senderId);
-    // setStore('file', {
-    //   name: data.fileName,
-    //   size: data.fileSize,
-    //   type: data.fileType
-    // });
-    acceptRef?.open();
-  };
+  // const handleFileTransferRequest = (data: any) => {
+  //   action.setTargetId(data.senderId)
+  //   action.setFile({
+  //     name: data.fileName,
+  //     size: data.fileSize,
+  //     type: data.fileType
+  //   })
+  //   // setStore('targetId', data.senderId);
+  //   // setStore('file', {
+  //   //   name: data.fileName,
+  //   //   size: data.fileSize,
+  //   //   type: data.fileType
+  //   // });
+  //   acceptRef?.open();
+  // };
 
-  const handleWebRTCMessage = (e: any) => {
-    if (e.type === "progress") {
-      // setStore("progress", e.data);
-      action.setProgress(e.data)
-      updateProgress(e.data, e.speed);
-    } else if (e.type === "fileReceived") {
-      setProgressDone();
-    } else if (e.type === "transferStart") {
-      resetProgress();
-    }
-  };
+  // const handleWebRTCMessage = (e: any) => {
+  //   if (e.type === "progress") {
+  //     // setStore("progress", e.data);
+  //     action.setProgress(e.data)
+  //     updateProgress(e.data, e.speed);
+  //   } else if (e.type === "fileReceived") {
+  //     setProgressDone();
+  //   } else if (e.type === "transferStart") {
+  //     resetProgress();
+  //   }
+  // };
 
-  const updateProgress = (value: number, speed: number) => {
-    userProgressRef?.setValue(value);
-    userProgressRef?.setSpeed(speed);
-    receiverProgressRef?.setValue(value);
-    receiverProgressRef?.setSpeed(speed);
-  };
+  // const updateProgress = (value: number, speed: number) => {
+  //   userProgressRef?.setValue(value);
+  //   userProgressRef?.setSpeed(speed);
+  //   receiverProgressRef?.setValue(value);
+  //   receiverProgressRef?.setSpeed(speed);
+  // };
 
-  const resetProgress = () => {
-    userProgressRef?.setDone(false);
-    userProgressRef?.setValue(0);
-    userProgressRef?.setSpeed(0);
-    receiverProgressRef?.setDone(false);
-    receiverProgressRef?.setValue(0);
-    receiverProgressRef?.setSpeed(0);
-  };
+  // const resetProgress = () => {
+  //   userProgressRef?.setDone(false);
+  //   userProgressRef?.setValue(0);
+  //   userProgressRef?.setSpeed(0);
+  //   receiverProgressRef?.setDone(false);
+  //   receiverProgressRef?.setValue(0);
+  //   receiverProgressRef?.setSpeed(0);
+  // };
 
-  const setProgressDone = () => {
-    userProgressRef?.setDone(true);
-    receiverProgressRef?.setDone(true);
-    acceptRef?.close();
-  };
+  // const setProgressDone = () => {
+  //   userProgressRef?.setDone(true);
+  //   receiverProgressRef?.setDone(true);
+  //   acceptRef?.close();
+  // };
 
 
-  const onInvite = (targetId: string) => {
-    if (isInviting()) return; // If already inviting, return
-    setIsInviting(true);
+  // const onInvite = (targetId: string) => {
+  //   if (isInviting()) return; // If already inviting, return
+  //   setIsInviting(true);
 
-    const { ws, userId, file, shareId } = state;
-    if (!file) {
-      alert("Please select a file");
-      setIsInviting(false);
-      return;
-    }
-    if (file.size == 0) {
-      alert("The selected file 0 size");
-      setIsInviting(false);
-      return;
-    }
+  //   const { ws, userId, file, shareId } = state;
+  //   if (!file) {
+  //     alert("Please select a file");
+  //     setIsInviting(false);
+  //     return;
+  //   }
+  //   if (file.size == 0) {
+  //     alert("The selected file 0 size");
+  //     setIsInviting(false);
+  //     return;
+  //   }
 
-    // Reset progress bar status
-    userProgressRef?.setDone(false);
-    userProgressRef?.setValue(0);
-    userProgressRef?.setSpeed(0);
+  //   // Reset progress bar status
+  //   userProgressRef?.setDone(false);
+  //   userProgressRef?.setValue(0);
+  //   userProgressRef?.setSpeed(0);
 
-    ws?.send(JSON.stringify({
-      type: "accept-request",
-      userId,
-      target: targetId,
-      shareId,
-      accepted: false,
-      file: {
-        name: (file as File).name,
-        size: (file as File).size,
-        type: (file as File).type,
-      }
-    }));
+  //   ws?.send(JSON.stringify({
+  //     type: "accept-request",
+  //     userId,
+  //     target: targetId,
+  //     shareId,
+  //     accepted: false,
+  //     file: {
+  //       name: (file as File).name,
+  //       size: (file as File).size,
+  //       type: (file as File).type,
+  //     }
+  //   }));
 
-    // Set a short delay to prevent rapid consecutive clicks
-    setTimeout(() => {
-      setIsInviting(false);
-    }, 2000); // Reset status after 2 seconds
-  };
+  //   // Set a short delay to prevent rapid consecutive clicks
+  //   setTimeout(() => {
+  //     setIsInviting(false);
+  //   }, 2000); // Reset status after 2 seconds
+  // };
 
-  const onAccept = async () => {
-    let reciverWebrtc = new WebRTCImpl();
-    reciverWebrtc.fileReceiver = new LargeFileReceiver(state.file?.name || "test")
-    // reciverWebrtc.onmessage = (e: any) => {
-    //   console.log(e)
-    //   if (e.type == "icecandidate") {
-    //     state.ws?.send(JSON.stringify({
-    //       type: "new-ice-candidate",
-    //       target: state.userId,
-    //       candidate: e.candidate
-    //     }));
-    //   }
-    // }
-    action.setReciver({
-      ...state.reciever,
-      filename: state.file?.name || "",
-      webrtc: reciverWebrtc
-    })
+  // const onAccept = async () => {
+  //   let reciverWebrtc = new WebRTCReceiver();
+  //   // reciverWebrtc.fileReceiver = new LargeFileReceiver(state.file?.name || "test")
+  //   // reciverWebrtc.onmessage = (e: any) => {
+  //   //   console.log(e)
+  //   //   if (e.type == "icecandidate") {
+  //   //     state.ws?.send(JSON.stringify({
+  //   //       type: "new-ice-candidate",
+  //   //       target: state.userId,
+  //   //       candidate: e.candidate
+  //   //     }));
+  //   //   }
+  //   // }
+  //   action.setReciver({
+  //     ...state.reciever,
+  //     filename: state.file?.name || "",
+  //     webrtc: reciverWebrtc
+  //   })
 
-    // webrtc.fileReceiver = new LargeFileReceiver(state.file?.name|| "test");
-    await reciverWebrtc.fileReceiver.start();
-    receiverProgressRef?.open();
-    receiverProgressRef?.setDone(false);
+  //   // webrtc.fileReceiver = new LargeFileReceiver(state.file?.name|| "test");
+  //   // await reciverWebrtc.fileReceiver.start();
+  //   receiverProgressRef?.open();
+  //   receiverProgressRef?.setDone(false);
 
-    const { ws, userId, targetId, shareId } = state;
-    ws?.send(JSON.stringify({
-      type: "request-status",
-      userId,
-      target: targetId,
-      shareId,
-      status: "accepted",
-      filename: state.file?.name,
-      size: state.file?.size
-    }));
-    acceptRef?.close();
+  //   const { ws, userId, targetId, shareId } = state;
+  //   ws?.send(JSON.stringify({
+  //     type: "request-status",
+  //     userId,
+  //     target: targetId,
+  //     shareId,
+  //     status: "accepted",
+  //     filename: state.file?.name,
+  //     size: state.file?.size
+  //   }));
+  //   acceptRef?.close();
 
-  };
+  // };
 
-  const onDecline = () => {
-    const { ws, userId, shareId, targetId } = state;
-    ws?.send(JSON.stringify({
-      type: "request-status",
-      userId,
-      target: targetId,
-      shareId,
-      status: "declined"
-    }));
-    acceptRef?.close();
-  };
-
+  // const onDecline = () => {
+  //   const { ws, userId, shareId, targetId } = state;
+  //   ws?.send(JSON.stringify({
+  //     type: "request-status",
+  //     userId,
+  //     target: targetId,
+  //     shareId,
+  //     status: "declined"
+  //   }));
+  //   acceptRef?.close();
+  // };
+  // console.log(state.userList)
   return (
     <div class='container mx-auto mt-2 px-4 sm:px-4 lg:px-4'>
 
@@ -252,9 +259,10 @@ const App: Component = () => {
           <div class="flex flex-auto w-full text-center">
             {state.role === "sender" && (
               <div id="sender" class='w-full'>
-                <Upload >
+                <Sender/>
+                {/* <Upload >
                   <ProgressBar ref={(r: any) => userProgressRef = r} />
-                </Upload>
+                </Upload> */}
                 {/* <div id="receiver-list" class='w-full container mt-4 flex flex-wrap justify-center'>
                   {store.userIds.map(user => (
                     <div class='bg-gradient-to-r from-gray-600 to-gray-900 min-w-[20%] max-w-[100%] m-4 p-0.5 rounded-lg hover:from-gray-100 hover:to-gray-600 transition duration-300'>
@@ -292,11 +300,11 @@ const App: Component = () => {
       {state.role === "receiver" && (
         <div id="receivers" class='w-full container mt-4'>
           <Receiver file={state.file}>
-            <ProgressBar ref={(r: any) => receiverProgressRef = r} />
+            {/* <ProgressBar ref={(r: any) => receiverProgressRef = r} /> */}
           </Receiver>
         </div>
       )}
-      <AcceptBanner ref={el => acceptRef = el} onAccept={onAccept} onDecline={onDecline} user={state.targetId} />
+      
       <StatisticsManager totalSize={state.totalSize} totalFiles={state.totalFiles} />
     </div>
   );

@@ -17,6 +17,7 @@ function Upload(props:any) {
     const change = (event: any) => {
         let files = event.currentTarget.files
         // props.setStore("file", () => files[0])
+        props.onFileUpload(files)
         action.setFile(files[0])
         action.setUserList(state.userList.map(user=>{
             let nuser = {...user,filename:files[0].name}

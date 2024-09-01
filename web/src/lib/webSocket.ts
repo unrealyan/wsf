@@ -1,20 +1,21 @@
-import WebRTCImpl,{ WebRTCInterface } from "./webrtc";
+import WebRTCImpl, { WebRTCInterface } from "./webrtc";
 import { createStore, type SetStoreFunction, type Store } from "solid-js/store";
 import { User } from "../boards/userlist";
-import { ActionType, StateType, useStore } from "./store";
+import { ActionType, StateType, useStore, IReceiver } from "./store";
 import { Console } from "console";
+import { WebRTCReceiver, WebRTCSender } from "./mywebrtc";
 
 export interface StoreType {
     userId: string;
     targetId: string;
     userIds: string[];
-    userList: User[];
+    userList: IReceiver[];
     file: null | File | { name: string; size: number; type: string };
     shareId: string;
     searchParam: URLSearchParams;
     progress: number;
     fileStream: Promise<any> | null;
-    ws: WebSocket | null;
+    ws: WebSocketClient | null;
     role: "sender" | "receiver";
     totalFiles: number,
     totalSize: number
@@ -84,6 +85,15 @@ export default class WebSocketClient {
 
     }
 
+    sendOffer({userId,targetId,offer}:any){
+        this.ws.send(JSON.stringify({
+            type: "offer",
+            userId,
+            targetId,
+            offer
+        }))
+    }
+
     listen(state: StateType, action: ActionType) {
         if (!this.ws) {
             throw new Error("WebSocket not initialized");
@@ -91,109 +101,122 @@ export default class WebSocketClient {
 
         this.ws.onmessage = (e) => {
             let data = JSON.parse(e.data);
+
+            // Common events for both sender and receiver
             switch (data.type) {
                 case "user-id":
-                    action.setUserId(data.userId);
-                    if (data.shareId) {
-                        sessionStorage.setItem("shareId", data.shareId);
-                        action.setShareId(data.shareId);
-                    }
-                    this.ws.send(JSON.stringify({
-                        type: state.searchParam.get("s") ? "receiver" : "sender",
-                        userId: data.userId
-                    }));
+                    this.handleUserId(data, state, action);
                     break;
-                case "all-receivers":
-                    // action.setUserIds(data.userIds || []); // 使用 action 更新 userIds
-                    action.setUserList(data.userIds.map((id: string) => ({
-                        id,
-                        filename: state.file?.name,
-                        progress: 1,
-                        speed: 0,
-                        start: false,
-                        webrtc: new WebRTCImpl()
-                    }))); // 使用 action 更新 userList
-                    break;
-
-                case "join":
-                    console.log("state.userList")
-                    state.userList.forEach(user=>{
-                    user.webrtc?.createOffer().then(offer => {
-                        console.log(state)
-                        this.ws.send(JSON.stringify({
-                            name: state.userId,
-                            target: user.id,
-                            type: "offer",
-                            sdp: offer
-                        }));
-                    });
-                })
-                    break;
-
-                case "offer":
-                    state.reciever.webrtc?.createAnswer().then(answer => {
-                        this.ws.send(JSON.stringify({
-                            name: state.userId,
-                            target: state.targetId,
-                            type: "answer",
-                            sdp: answer
-                        }));
-                    },err=>{
-                        console.log(err)
-                    });
-                    
-                    break;
-
-                case "answer":
-                    state.userList.forEach(user=>{
-                        user.webrtc?.addAnswer(data.sdp);
-                    })
-                
-                    break;
-
                 case "new-ice-candidate":
-                   
-                    state.userList.forEach(user=>{
-                        const candidate = new RTCIceCandidate(data.candidate);
-                        user.webrtc?.addIceCandidates(candidate);
-                    })
-                   
+                    this.handleNewIceCandidate(data, state);
                     break;
+            }
 
-                case "request-status":
-                    if (data.status === "accepted") {
-                        this.userProgressRef.open();
-                        this.ws.send(JSON.stringify({
-                            type: "initiate",
-                            userId: state.userId,
-                            shareId: state.shareId,
-                            target: data.userId
-                        }));
-                    }
-                    break;
+            // Sender-specific events
+            if (state.role === "sender") {
+                this.handleSenderEvents(data, state, action);
+            }
 
-                case "accept-request":
-                    action.setFile(data.file); // 使用 action 更新 file
-                    action.setTargetId(data.userId); // 使用 action 更新 targetId
-                    console.log(this.acceptRef)
-                    this.acceptRef.open();
-                    break;
-
-                case "file-transfer-request":
-                    action.setTargetId(data.senderId); // 使用 action 更新 targetId
-                    action.setFile({
-                        name: data.fileName,
-                        size: data.fileSize,
-                        type: data.fileType
-                    }); // 使用 action 更新 file
-                    this.acceptRef.open();
-                    break;
-
-                case "stats":
-                    action.setTotalSize(data.totalSize); // 使用 action 更新 totalSize
-                    action.setTotalFiles(data.totalFiles); // 使用 action 更新 totalFiles
-                    break;
+            // Receiver-specific events
+            if (state.role === "receiver") {
+                this.handleReceiverEvents(data, state, action);
             }
         };
     }
+
+    private handleUserId(data: any, state: StateType, action: ActionType) {
+        action.setUserId(data.userId);
+        if (data.shareId) {
+            sessionStorage.setItem("shareId", data.shareId);
+            action.setShareId(data.shareId);
+        }
+        this.ws.send(JSON.stringify({
+            type: state.searchParam.get("s") ? "receiver" : "sender",
+            userId: data.userId
+        }));
+    }
+
+    private handleNewIceCandidate(data: any, state: StateType) {
+        // Implement ICE candidate handling for both sender and receiver
+    }
+
+    private handleSenderEvents(data: any, state: StateType, action: ActionType) {
+        switch (data.type) {
+            case "all-receivers":
+                this.handleAllReceivers(data, state, action);
+                break;
+            case "answer":
+                this.handleAnswer(data, state);
+                break;
+            case "request-status":
+                this.handleRequestStatus(data, state);
+                break;
+            case "stats":
+                this.handleStats(data, action);
+                break;
+        }
+    }
+
+    private handleAllReceivers(data: any, state: StateType, action: ActionType) {
+        // Implement the logic for handling all receivers
+        // For example:
+        console.log(data)
+        action.setUserList(data.userIds.map((user: string) => ({
+            id: user,
+            filename: '',
+            progress: 0,
+            speed: 0,
+            start: false
+        })));
+    }
+
+    private handleReceiverEvents(data: any, state: StateType, action: ActionType) {
+        switch (data.type) {
+            case "offer":
+                this.handleOffer(data, state);
+                break;
+            case "file-transfer-request":
+                this.handleFileTransferRequest(data, action);
+                break;
+        }
+    }
+
+    // Add this method
+    private handleOffer(data: any, state: StateType) {
+        // Implement the logic for handling the offer
+        console.log("Received offer:", data);
+        // Add your specific logic here, e.g.:
+        // state.webRTC?.setRemoteDescription(data.offer);
+    }
+
+    private handleAnswer(data: any, state: StateType) {
+        // Implement the logic for handling the answer
+        // For example:
+        // state.webRTC?.setRemoteDescription(data.answer);
+    }
+
+    private handleRequestStatus(data: any, state: StateType) {
+        // Implement the logic for handling request status
+        console.log("Received request status:", data);
+        // Add your specific logic here
+    }
+
+    private handleStats(data: any, action: ActionType) {
+        // Implement the logic for handling stats
+        console.log("Received stats:", data);
+        // Add your specific logic here, e.g.:
+        // action.updateStats(data.stats);
+    }
+
+    // ... implement the individual handler methods ...
+
+    // Add this method
+    private handleFileTransferRequest(data: any, action: ActionType) {
+        console.log("Received file transfer request:", data);
+        // Implement the logic for handling file transfer request
+        // For example:
+        // action.setFileTransferRequest(data.fileInfo);
+    }
+
+    // ... existing code ...
 }
