@@ -1,4 +1,4 @@
-
+import eventManager, { EventManager } from './eventManager';
 
 class WebRTCBase {
     protected peerConnection: RTCPeerConnection;
@@ -24,7 +24,7 @@ class WebRTCBase {
               }
         ]
     }) {
-        console.log(configuration)
+
         this.peerConnection = new RTCPeerConnection(configuration);
         this.setupPeerConnectionListeners();
     }
@@ -38,7 +38,7 @@ class WebRTCBase {
         this.peerConnection.addEventListener("icecandidate", (e) => {
             if (e.candidate) {
                 console.log(e.candidate)
-                this.onIceCandidate(e.candidate);
+                // this.onIceCandidate(e.candidate);
             } else {
                 console.log("ICE candidate gathering completed");
                 this.onIceGatheringComplete();
@@ -55,6 +55,7 @@ class WebRTCBase {
 
     protected onIceCandidate(candidate: RTCIceCandidate) {
         console.log("New ICE candidate:", candidate);
+
         this.emit('iceCandidate', candidate);
     }
 
@@ -85,7 +86,7 @@ class WebRTCBase {
         sdp.split('\r\n').forEach(line => console.log(line));
     }
 
-    async setRemoteDescription(description: RTCSessionDescriptionInit) {
+    async setRemoteDescription(description: RTCSessionDescription) {
         try {
             if (!description || !description.type) {
                 throw new Error('Invalid remote description: missing or invalid type');
@@ -129,17 +130,70 @@ class WebRTCBase {
 
 export class WebRTCSender extends WebRTCBase {
     public dataChannel: RTCDataChannel | null = null;
+    private role:string
 
     constructor(configuration: RTCConfiguration = {}) {
         super(configuration);
-        console.log("WebRTCSender constructor");
+
         this.createDataChannel();
+        this.role = "SENDER"
+        this.peerConnection.addEventListener("iceconnectionstatechange",e=>{
+            console.log("ice: ",e)
+        })
+      
+        // this.peerConnection.addEventListener("datachannel",this.handleDatachannel);
+        this.peerConnection.addEventListener("signalingstatechange",e=>{
+            switch (this.peerConnection.iceConnectionState) {
+                case 'new':
+                    console.log('新连接');
+                    break;
+                case 'checking':
+                    console.log('正在检查连接');
+                    break;
+                case 'connected':
+                    console.log('连接成功');
+                    // 可以开始数据传输
+                    break;
+                case 'disconnected':
+                    console.log('连接已断开');
+                    // 处理连接断开逻辑
+                    break;
+                case 'failed':
+                    console.log('连接失败');
+                    // 处理连接失败逻辑
+                    break;
+                case 'closed':
+                    console.log('连接已关闭');
+                    // 清理资源
+                    break;
+                default:
+                    break;
+            }
+        })
+
+
+
     }
 
     private createDataChannel() {
         console.log("Creating data channel");
-        this.dataChannel = this.peerConnection.createDataChannel("fileTransfer");
+        this.dataChannel = this.peerConnection.createDataChannel("fileTransfer",{
+            ordered:true
+        });
+        this.dataChannel.binaryType = "arraybuffer";
         this.setupDataChannelListeners();
+    }
+
+    private handleDatachannel(e:RTCDataChannelEvent){
+        let recieveChannel = e.channel;
+
+        recieveChannel.addEventListener("error", (err) => {
+            console.log("Error:", err);
+        });
+
+        recieveChannel.addEventListener("message", e=>{
+            console.log(e)
+        });
     }
 
     protected setupDataChannelListeners() {
@@ -147,7 +201,8 @@ export class WebRTCSender extends WebRTCBase {
 
         this.dataChannel.onopen = () => {
             console.log("Data channel opened");
-            this.emit('dataChannelOpen');
+            // this.emit('dataChannelOpen');
+            eventManager.emit("FILE_TRANSFER_START",{role:this.role})
         };
 
         this.dataChannel.onclose = () => {
@@ -160,19 +215,38 @@ export class WebRTCSender extends WebRTCBase {
     }
 
     async createOffer(): Promise<RTCSessionDescriptionInit> {
-        const offerOptions: RTCOfferOptions = {
-            offerToReceiveAudio: false,
-            offerToReceiveVideo: false
-        };
-        const offer = await this.peerConnection.createOffer(offerOptions);
+        console.log("createOffer")
+    
+        const offer = await this.peerConnection.createOffer();
         await this.peerConnection.setLocalDescription(offer);
+
         return offer;
     }
 
-    async sendFile(file: File) {
-        if (!this.isDataChannelReady()) {
-            throw new Error("Data channel is not ready");
+    async addAnswer (answer: RTCSessionDescriptionInit) {
+        console.log("addAnswer")
+        let { peerConnection } = this;
+        // 检查当前状态是否为 'have-remote-offer' 并且 answer 包含有效的 sdp 和 type
+        if (peerConnection.signalingState === 'have-local-offer' && answer && answer.sdp && answer.type) {
+            await peerConnection.setRemoteDescription(answer);
+            console.log("accepted-answer");
+            this.peerConnection.addEventListener("icecandidate", (e) => {
+                if (e.candidate) {
+                    console.log(e.candidate)
+                    eventManager.emit("SEND_NEW_ICE_CANDIDATE",e.candidate)
+                    this.addIceCandidate(new RTCIceCandidate(e.candidate))
+                }
+            });
+        } else {
+            console.error("Cannot set remote description: Current state is", peerConnection.signalingState);
+            console.error("Invalid answer:", answer);
         }
+    };
+
+    async sendFile(file: File) {
+        // if (!this.isDataChannelReady()) {
+        //     throw new Error("Data channel is not ready");
+        // }
 
         const chunkSize = 16384; // 16 KB chunks
         const fileReader = new FileReader();
@@ -203,14 +277,14 @@ export class WebRTCSender extends WebRTCBase {
     }
 
     async addIceCandidate(candidate: RTCIceCandidate) {
-        await this.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+        await this.peerConnection.addIceCandidate(candidate);
     }
 
     getSignalingState(): RTCSignalingState {
         return this.peerConnection.signalingState;
     }
 
-    async setLocalDescription(description: RTCSessionDescriptionInit): Promise<void> {
+    async setLocalDescription(description: RTCSessionDescription): Promise<void> {
         await this.peerConnection.setLocalDescription(description);
     }
 
@@ -233,33 +307,61 @@ export class WebRTCReceiver extends WebRTCBase {
 
     constructor(configuration: RTCConfiguration = {}) {
         super(configuration);
-        this.setupFileTransferListeners();
-    }
 
-    private setupFileTransferListeners() {
-        this.on('fileTransferStart', (metadata: { name: string, size: number }) => {
-            this.fileBuffer = [];
-            this.expectedFileSize = metadata.size;
-            this.receivedSize = 0;
-        });
+       
 
-        this.on('fileChunkReceived', (chunk: ArrayBuffer) => {
-            this.fileBuffer.push(chunk);
-            this.receivedSize += chunk.byteLength;
-
-            if (this.receivedSize === this.expectedFileSize) {
-                const file = new File(this.fileBuffer, 'receivedFile', { type: 'application/octet-stream' });
-                this.emit('fileReceived', file);
-                this.fileBuffer = [];
+        this.peerConnection.addEventListener("iceconnectionstatechange",e=>{
+            switch (this.peerConnection.iceConnectionState) {
+                case 'new':
+                    console.log('新连接');
+                    break;
+                case 'checking':
+                    console.log('正在检查连接');
+                    break;
+                case 'connected':
+                    console.log('连接成功');
+                    this.openDataChannel()
+                    // this.setupPeerConnectionListeners();
+                    // 可以开始数据传输
+                    break;
+                case 'disconnected':
+                    console.log('连接已断开');
+                    // 处理连接断开逻辑
+                    break;
+                case 'failed':
+                    console.log('连接失败');
+                    // 处理连接失败逻辑
+                    break;
+                case 'closed':
+                    console.log('连接已关闭');
+                    // 清理资源
+                    break;
+                default:
+                    break;
             }
-        });
+        })
     }
 
-    async acceptOffer(offer: RTCSessionDescriptionInit): Promise<RTCSessionDescriptionInit> {
-        await this.peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-        const answer = await this.peerConnection.createAnswer();
-        await this.peerConnection.setLocalDescription(answer);
-        return answer;
+   
+
+    async acceptOffer(offer: RTCSessionDescription): Promise<RTCSessionDescriptionInit> {
+        console.log("acceptOffer")
+        await this.peerConnection.setRemoteDescription(offer);
+        // 检查状态
+        if (this.peerConnection.signalingState === 'have-remote-offer') {
+            const answer = await this.peerConnection.createAnswer();
+            await this.peerConnection.setLocalDescription(answer);
+            this.peerConnection.addEventListener("icecandidate", (e) => {
+                if (e.candidate) {
+                    console.log(e.candidate)
+                    eventManager.emit("SEND_NEW_ICE_CANDIDATE",e.candidate)
+                    this.addIceCandidate(new RTCIceCandidate(e.candidate))
+                }
+            });
+            return answer;
+        } else {
+            throw new Error('PeerConnection is not in the correct state to set local description');
+        }
     }
 
     async createAnswer(): Promise<RTCSessionDescriptionInit> {
@@ -267,12 +369,27 @@ export class WebRTCReceiver extends WebRTCBase {
         return answer;
     }
 
-    async setLocalDescription(description: RTCSessionDescriptionInit): Promise<void> {
+    async addIceCandidate(candidate: RTCIceCandidate) {
+        await this.peerConnection.addIceCandidate(candidate);
+    }
+
+    async setLocalDescription(description: RTCSessionDescription): Promise<void> {
         await this.peerConnection.setLocalDescription(description);
     }
 
-    async setRemoteDescription(description: RTCSessionDescriptionInit): Promise<void> {
-        await this.peerConnection.setRemoteDescription(new RTCSessionDescription(description));
+    async setRemoteDescription(description: RTCSessionDescription): Promise<void> {
+        await this.peerConnection.setRemoteDescription(description);
+    }
+
+    async openDataChannel() {
+        console.log("receiver openDataChannel")
+        if (!this.isDataChannelReady()) {
+            this.dataChannel = await this.peerConnection.createDataChannel('fileTransfer');
+            this.dataChannel.addEventListener('message', (event) => {
+                console.log(event.data)
+                this.handleIncomingData(event.data);
+            });
+        }
     }
 
     onFileReceived(callback: (file: File) => void) {
@@ -283,21 +400,21 @@ export class WebRTCReceiver extends WebRTCBase {
         if (typeof data === 'string') {
             const metadata = JSON.parse(data);
             if (metadata.type === 'fileStart') {
-                this.emit('fileTransferStart', { name: metadata.name, size: metadata.size });
+                eventManager.emit('fileTransferStart', { name: metadata.name, size: metadata.size });
             }
         } else if (data instanceof ArrayBuffer) {
-            this.emit('fileChunkReceived', data);
+            eventManager.emit('fileChunkReceived', data);
         }
     }
 
     protected onIceCandidate(candidate: RTCIceCandidate) {
         // Implement the logic to send the ICE candidate to the other peer
         // For example, you might emit an event that can be handled by the application
-        this.emit('newIceCandidate', candidate);
+        eventManager.emit('newIceCandidate', candidate);
     }
 
     protected onConnected() {
         super.onConnected();
-        this.emit('ready_for_file');
+        eventManager.emit('ready_for_file',"");
     }
 }

@@ -1,9 +1,11 @@
-import { createEffect, onMount } from "solid-js"
+import { createEffect, createSignal, onMount } from "solid-js"
 import { formatBytes } from "../lib/fileUtil";
-import { useStore } from "../lib/store";
+import { useStore,UploadStoreManager } from "../lib/store";
+import eventManager, { EventManager } from '../lib/eventManager';
 
 function Upload(props:any) {
     const [state,action] = useStore()
+    const[ ,]= createSignal(new UploadStoreManager(state,action))
     let drapRef: HTMLDivElement
 
     createEffect(() => {
@@ -18,11 +20,12 @@ function Upload(props:any) {
         let files = event.currentTarget.files
         // props.setStore("file", () => files[0])
         props.onFileUpload(files)
-        action.setFile(files[0])
-        action.setUserList(state.userList.map(user=>{
-            let nuser = {...user,filename:files[0].name}
-            return nuser
-        }))
+        eventManager.emit("CHANGE_FILES",files[0])
+        // action.setFile(files[0])
+        // action.setUserList(state.userList.map(user=>{
+        //     let nuser = {...user,filename:files[0].name}
+        //     return nuser
+        // }))
     }
 
     const dragStart = (event: any) => {
@@ -47,11 +50,12 @@ function Upload(props:any) {
                     const file = item.getAsFile();
                     console.log(`… file[${i}].name = ${file.name}`);
                     // props.setStore("file", () => file)
-                    action.setFile(file)
-                    action.setUserList(state.userList.map((user:any)=>{
-                        user.filename=file.name
-                        return user
-                    }))
+                    // action.setFile(file)
+                    // action.setUserList(state.userList.map((user:any)=>{
+                    //     user.filename=file.name
+                    //     return user
+                    // }))
+                   eventManager.emit("CHANGE_FILES",file)
                    
                 }
             });

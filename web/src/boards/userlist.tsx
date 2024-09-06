@@ -26,13 +26,13 @@ export default function UserListContainer(props: UserListContainerProps) {
     const [store, setStore] = createStore<UserListStore>({ userList: [] })
 
     createEffect(() => {
-        console.log(props.userList)
+
         let userlist: User[] = state.userList.map((user: User) => {
             let storeUser = store.userList.find(su => su.id === user.id);
 
             // 如果用户不存在于列表中，添加新用户
             if (!storeUser) {
-                console.log(state.file)
+
                 return {
                     ...user,
                     filename: state.file?.name || "",
@@ -62,33 +62,33 @@ export default function UserListContainer(props: UserListContainerProps) {
         }
     }, [props.userList, state.file?.name]);
 
-console.log(console.log(props.userList))
+
 
     const onInvite = () => {
         console.log("oninvite")
-        state.userList.forEach(user => {
-            state.ws?.send(JSON.stringify({
-                type: "accept-request",
-                userId: state.userId,
-                target: user.id,
-                shareId: state.shareId,
-                accepted: false,
-                file: {name:state.file?.name,size:state.file?.size}
-            }));
-        })
+        // state.userList.forEach(user => {
+        //     state.ws?.send(JSON.stringify({
+        //         type: "accept-request",
+        //         userId: state.userId,
+        //         target: user.id,
+        //         shareId: state.shareId,
+        //         accepted: false,
+        //         file: {name:state.file?.name,size:state.file?.size}
+        //     }));
+        // })
     }
 
     const initiateWebrtc = () => {
-        state.userList.forEach(user => {
-            state.ws?.send(JSON.stringify({
-                type: "accept-request",
-                userId: state.userId,
-                target: user.id,
-                shareId: state.shareId,
-                accepted: false,
-                file: state.file
-            }));
-        })
+        // state.userList.forEach(user => {
+        //     state.ws?.send(JSON.stringify({
+        //         type: "accept-request",
+        //         userId: state.userId,
+        //         target: user.id,
+        //         shareId: state.shareId,
+        //         accepted: false,
+        //         file: state.file
+        //     }));
+        // })
     }
 
     return <For each={props.userList} fallback={<div>Loading...</div>}>

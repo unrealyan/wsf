@@ -5,6 +5,9 @@ import { WebRTCReceiver, WebRTCSender } from './mywebrtc';
 import WebSocketClient from './webSocket';
 import { IWebSocket } from './mywebSocket';
 import eventManager, { EventManager } from './eventManager';
+import { off } from 'process';
+import { error } from 'console';
+import { WSFWebRTC } from './wsfrtc/webrtc';
 
 
 export interface User {
@@ -14,6 +17,15 @@ export interface User {
   speed: number;
   start: boolean;
   // webrtc?: WebRTCSender |WebRTCSender| null
+}
+
+export interface Peer {
+  id: string;
+  filename: string;
+  progress: number;
+  speed: number;
+  start: boolean;
+  webrtc?: WSFWebRTC | null
 }
 
 
@@ -33,7 +45,7 @@ export interface StateType {
   userType: string;
   targetId: string;
   userIds: string[];
-  userList: User[];
+  userList: Peer[];
   file: File | null;
   shareId: string;
   searchParam: URLSearchParams;
@@ -53,7 +65,7 @@ export interface ActionType {
   setTargetId: (id: string) => void;
   addUserId: (id: string) => void;
   removeUserId: (id: string) => void;
-  setUserList: (list: User[]) => void;
+  setUserList: (list: Peer[]) => void;
   setFile: (file: File | { name: string; size: number; type: string } | null) => void;
   setShareId: (id: string) => void;
   setSearchParam: (params: URLSearchParams) => void;
@@ -120,7 +132,7 @@ export default function StoreProvider(props: any) {
       setTargetId: (id: string) => setState('targetId', id),
       addUserId: (id: string) => setState('userIds', ids => [...ids, id]),
       removeUserId: (id: string) => setState('userIds', ids => ids.filter(uid => uid !== id)),
-      setUserList: (list: User[]) => setState('userList', list => [...list]),
+      setUserList: (list: Peer[]) => setState('userList', [...list]),
       setFile: (file: File | { name: string; size: number; type: string } | null) => setState('file', file),
       setShareId: (id: string) => setState('shareId', id),
       setSearchParam: (params: URLSearchParams) => setState('searchParam', params),
@@ -155,21 +167,22 @@ export function useStore() {
 }
 
 export class StoreManager {
-  private eventManager: EventManager;
-  private state: StateType;
-  private action: ActionType;
+  public eventManager: EventManager;
+  public state: StateType;
+  public action: ActionType;
 
   constructor({ state, action }: { state: StateType; action: ActionType }) {
     this.eventManager = eventManager;
     this.state = state;
     this.action = action;
-    this.eventManager.subscribe("SET_USER_ID", this.handleSetUserId.bind(this))
-    this.eventManager.subscribe("SET_SHARE_ID", this.handleSetShareId.bind(this))
-    this.eventManager.subscribe("SET_STATS",this.handleSetStats.bind(this))
+    // this.eventManager.subscribe("SET_USER_ID", this.handleSetUserId.bind(this))
+    // this.eventManager.subscribe("SET_SHARE_ID", this.handleSetShareId.bind(this))
+    // this.eventManager.subscribe("SET_STATS", this.handleSetStats.bind(this))
+    // this.eventManager.subscribe("SET_RECEIVERS", this.handleSetReceivers.bind(this))
   }
 
   private handleSetUserId(userId: string) {
-    console.log(userId)
+
     this.action.setUserId(userId)
   }
 
@@ -194,5 +207,136 @@ export class StoreManager {
     this.action.setTotalSize(totalSize)
   }
 
+  private handleSetReceivers(userIds: string[]) {
+
+    let users = userIds.map((id: string) => {
+      let user: User = {
+        id,
+        filename: "",
+        start: false,
+        progress: 0,
+        speed: 0
+      }
+      return user
+    })
+    this.action.setUserList(users)
+  }
+
+}
+
+export class UploadStoreManager extends StoreManager {
+  constructor(state: any, action: any) {
+    super({ state, action });
+    // this.eventManager.subscribe("CHANGE_FILES", this.handleOnChangeFiles.bind(this))
+  }
+
+  private handleOnChangeFiles(file: File) {
+    this.action.setFile(file)
+  }
+}
+
+export class SenderStoreManager extends StoreManager {
+  public webrtc!: WebRTCSender
+  constructor(state: any, action: any) {
+    super({ state, action });
+
+    // this.eventManager.subscribe("START_WEBRTC", this.handleStartWebRTC.bind(this))
+    // this.eventManager.subscribe("GET_ANSWER", this.handleSetAnswer.bind(this))
+    // this.eventManager.subscribe("SEND_NEW_ICE_CANDIDATE", this.handleNewIceCandidate.bind(this))
+    // this.eventManager.subscribe("SAVE_ICE_CANDIDATE", this.handleSaveIceCandidate.bind(this))
+    // this.eventManager.subscribe("FILE_TRANSFER_START", this.handleFileTransferStart.bind(this))
+  }
+
+  private handleStartWebRTC() {
+    // this.webrtc = new WebRTCSender()
+    this.webrtc.createOffer().then(offer => {
+
+      this.state.userList.forEach(user => {
+        let data = JSON.stringify({
+          name: this.state.userId,
+          type: "offer",
+          sdp: offer,
+          target: user.id
+        })
+        this.state.ws?.sendOffer(data)
+      })
+      // this.webrtc.setLocalDescription(new RTCSessionDescription(offer))
+    })
+  }
+
+  private handleSetAnswer(answer: RTCSessionDescription) {
+    console.log("answer: ",answer)
+    this.webrtc.addAnswer(answer).then(() => {
+      // const file = new File(["foo"], "foo.txt", {
+      //   type: "text/plain",
+      // });
+      // this.webrtc.sendFile(file)
+    })
+    // this.webrtc.setRemoteDescription(answer)
+
+  }
+  private handleNewIceCandidate(candidate: RTCIceCandidate) {
+    this.state.userList.forEach(user=>{
+      let data = JSON.stringify({
+      type: "new-ice-candidate",
+      target: user.id,
+      candidate: candidate
+    })
+    this.state.ws?.sendCandidate(data)
+    })
+  }
+
+  private handleSaveIceCandidate(candidate:RTCIceCandidate){
+    this.webrtc.addIceCandidate(candidate)
+  }
+
+  private handleFileTransferStart({role}:any) {
+    console.log(role)
+    const file = new File(["foo"], "foo.txt", {
+      type: "text/plain",
+    });
+    this.webrtc.sendFile(file)
+  }
+}
+
+export class ReceiverStoreManager extends StoreManager {
+  public webrtc!: WebRTCReceiver
+  constructor(state: any, action: any) {
+    super({ state, action });
+    // this.eventManager.subscribe("SET_RECEIVER_ID", this.handleSetReceiverId.bind(this))
+    // this.eventManager.subscribe("GET_OFFER", this.handleGetOffer.bind(this))
+    // this.eventManager.subscribe("SEND_NEW_ICE_CANDIDATE", this.handleNewIceCandidate.bind(this))
+    // this.eventManager.subscribe("SAVE_ICE_CANDIDATE", this.handleSaveIceCandidate.bind(this))
+  }
+
+  handleSetReceiverId(target: string) {
+    this.action.setTargetId(target)
+  }
+
+  handleGetOffer(offer: RTCSessionDescription) {
+    this.webrtc.acceptOffer(offer).then((answer) => {
+      let data = JSON.stringify({
+        name: this.state.userId,
+        type: "answer",
+        sdp: answer,
+        target: this.state.targetId
+      })
+      this.state.ws?.sendAnswer(data)
+    }, rej => {
+      console.log(rej)
+    })
+  }
+  private handleNewIceCandidate(candidate: RTCIceCandidate) {
+    let data = JSON.stringify({
+      type: "new-ice-candidate",
+      target: this.state.targetId,
+      candidate: candidate
+    })
+    this.state.ws?.sendCandidate(data)
+  }
+
+  private handleSaveIceCandidate(candidate:RTCIceCandidate){
+    this.webrtc.addIceCandidate(candidate)
+  }
 
 }

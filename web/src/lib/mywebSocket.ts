@@ -3,6 +3,7 @@ import eventManager, { EventManager } from './eventManager';
 export interface IWebSocket {
     ws: WebSocket | null;
     eventManager: EventManager;
+    role:string;
     connect: (url: string) => void;
     onopen: (event: Event) => void;
     onclose: (event: CloseEvent) => void;
@@ -25,12 +26,13 @@ const uuidRegex = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}
 export class MyWebSocket implements IWebSocket {
     eventManager: EventManager;
     ws!: WebSocket;
+    role:string
 
     constructor() {
-        console.log(urlSP)
+
         let shareId = sessionStorage.getItem("shareId") || "";
         const urlShareId = urlSP.get("s") || "";
-
+        this.role = urlShareId? "receiver" : "sender"
         if (urlShareId && uuidRegex.test(urlShareId)) {
             shareId = urlShareId;
             sessionStorage.setItem("shareId", shareId);
@@ -39,12 +41,13 @@ export class MyWebSocket implements IWebSocket {
         } else {
             shareId = "";
         }
+       
 
         const wsUrl = new URL(WEBSOCKET_URL);
         if (shareId) {
             wsUrl.searchParams.set("s", shareId);
         }
-        console.log(wsUrl)
+
         this.connect(wsUrl.toString());
         this.eventManager = eventManager;
     }
@@ -69,16 +72,32 @@ export class MyWebSocket implements IWebSocket {
 
         this.ws.onmessage = (e) => {
             let data = JSON.parse(e.data);
-            console.log(data)
+
             // Common events for both sender and receiver
             switch (data.type) {
                 case "user-id":
-                    console.log(data)
+
                     this.eventManager.emit("SET_USER_ID",data.userId)
                     this.eventManager.emit("SET_SHARE_ID",data.shareId)
+                    this.sendRole(data.shareId,data.userId)
                     break;
                 case "stats":
                     this.eventManager.emit("SET_STATS",{totalFiles:data.totalFiles,totalSize:data.totalSize})
+                    break;
+                case "all-receivers":
+                    this.eventManager.emit("SET_RECEIVERS",data.userIds||[])
+                    break;
+                 case "offer":
+                    this.eventManager.emit("SET_RECEIVER_ID",data.name)
+                    this.eventManager.emit("GET_OFFER",data.sdp)
+                    break;
+                case "answer":
+                    this.eventManager.emit("GET_ANSWER",data.sdp)
+                    break;
+                case "new-ice-candidate":
+                    const candidate = new RTCIceCandidate(data.candidate);
+                    this.eventManager.emit("SAVE_ICE_CANDIDATE",candidate)
+                    break;
             }
         }
     };
@@ -90,7 +109,7 @@ export class MyWebSocket implements IWebSocket {
 
     };
     sendCandidate = (data: string) => {
-
+        this.ws.send(data);
     };
     sendProgress = (data: string) => {
 
@@ -105,14 +124,28 @@ export class MyWebSocket implements IWebSocket {
 
     };
 
+    sendRole = (shareId:string,userId:string) => {
+        let data =JSON.stringify({
+            type:this.role,
+            shareId,
+            userId,
+
+        })
+        this.ws?.send(data)
+    }
+
     sendOffer = (data: string) => {
         this.ws?.send(data);
     }
 
     sendAnswer = (data: string) => {
+
         this.ws?.send(data);
     }
 
 
 
 }
+
+const WSClient = new MyWebSocket();
+export default WSClient

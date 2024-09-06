@@ -222,7 +222,7 @@ func handleMessage(shareId, userId string, msg []byte) {
 		}
 		connMutex.Unlock()
 
-	case "offer", "answer", "new-ice-candidate", "accept-request", "request-status":
+	case "notice", "offer", "answer", "new-ice-candidate", "accept-request", "request-status":
 		target := data["target"].(string)
 		connMutex.Lock()
 		if conn, ok := connections[shareId][target]; ok {
@@ -266,6 +266,7 @@ func sendReceiversList(shareId string) {
 			conn.WriteJSON(map[string]interface{}{
 				"type":    "all-receivers",
 				"userIds": receivers[shareId],
+				"user":    id,
 			})
 		}
 	}

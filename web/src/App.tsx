@@ -30,7 +30,7 @@ interface SendFile {
 const App: Component = () => {
   const [state, action]: StoreType = useStore();
 
-  console.log(state)
+
 
   // const [store, setStore] = createStore<StateType>({
   //   userId: "",
@@ -57,6 +57,7 @@ const App: Component = () => {
   // let wsClient: WebSocketClient;
 
   const [isInviting, setIsInviting] = createSignal(false);
+  const [,] = createSignal(new StoreManager({state,action}))
 
   onMount(() => {
     batch(() => {
@@ -70,10 +71,10 @@ const App: Component = () => {
     // // wsClient.listen(store, setStore, webrtc);
     // wsClient.listen(state, action);
     // // setStore('ws', wsClient.ws);
-    let wsClient = new MyWebSocket()
-    wsClient.onmessage()
-    action.setWebSocket(wsClient)
-    new StoreManager({state,action})
+    // let wsClient = new MyWebSocket()
+    // wsClient.onmessage()
+    // action.setWebSocket(wsClient)
+    // new StoreManager({state,action})
 
 
     // wsClient.ws.addEventListener('message', handleWebSocketMessage);
@@ -248,7 +249,7 @@ const App: Component = () => {
   //   }));
   //   acceptRef?.close();
   // };
-  // console.log(state.userList)
+
   return (
     <div class='container mx-auto mt-2 px-4 sm:px-4 lg:px-4'>
 
