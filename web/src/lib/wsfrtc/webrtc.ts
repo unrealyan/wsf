@@ -5,14 +5,16 @@ export interface WSFWebRTC {
     webrtcPeer: RTCPeerConnection
     peerId: string
     sharerId: string
+    file:File | null
     // peerConnection(): RTCPeerConnection
     onIceCandidate(candidate: RTCIceCandidate): void
-    sendOffer(): void
+    sendOffer(): Promise<void>
     acceptOffer(offer: RTCSessionDescription): void
     sendAnswer(): void
     acceptAnswer(answer: RTCSessionDescription): void
     sendCandidate(candidate: RTCIceCandidate): void
     acceptCandidate(candidate: RTCIceCandidate): void
+    setFile(file:File): void
     sendFile(): void
     bindEvents(): void
 
@@ -45,6 +47,7 @@ class WSFWebRTCImpl implements WSFWebRTC {
     channel!:RTCDataChannel
     private messageHandler: ((e: MessageEvent) => void) | null = null;
     private fileWriter: FileSystemWritableFileStream | null = null
+    file!: File | null;
 
     constructor({ role,peerId, sharerId, selfId }: WSFWebRTCType) {
         console.log("connectWebRTC", peerId, sharerId)
@@ -54,7 +57,7 @@ class WSFWebRTCImpl implements WSFWebRTC {
         this.selfId = selfId
         this.sharerId = sharerId
         this.webrtcPeer = new RTCPeerConnection(configuration)
-       
+        this.fileReceiver = new LargeFileReceiver("test")
         
         if (role === "sender") {
             this.channel?.addEventListener("open", this.onDataChannelOpen)
@@ -122,6 +125,7 @@ class WSFWebRTCImpl implements WSFWebRTC {
         this.bindEvents = this.bindEvents.bind(this)
         this.onDataChannelOpen = this.onDataChannelOpen.bind(this)
         this.onRecieveChannelOpen = this.onRecieveChannelOpen.bind(this)
+        this.setFile = this.setFile.bind(this)
         
     }
 
@@ -138,14 +142,29 @@ class WSFWebRTCImpl implements WSFWebRTC {
         WSclient.on("ACCEPT_CANDIDATE_AND_EXCHANGE", this.acceptCandidate)
     }
 
+    setFile(file: File): void {
+        this.file = file;
+    }
+
     onIceCandidate(candidate: RTCIceCandidate): void {
         console.log("onIceCandidate", candidate)
         this.sendCandidate(candidate)
     }
     async sendOffer(): Promise<void> {
-        this.channel = this.webrtcPeer.createDataChannel("fileTransfer",{
+        this.channel = this.webrtcPeer.createDataChannel(JSON.stringify({
+            name:this.file?.name,
+            size:this.file?.size
+        }),{
             ordered:true
         })
+        this.channel.addEventListener("open", this.onDataChannelOpen, { once: true });
+        this.channel.addEventListener("message", (e)=>{
+            console.log(e)
+        })
+        this.channel.addEventListener("close", () => {
+            this.isTransferring = false;
+            console.log('Data channel closed');
+        });
         this.channel.binaryType = "arraybuffer";
 
         let offer = await this.webrtcPeer.createOffer()
@@ -159,6 +178,7 @@ class WSFWebRTCImpl implements WSFWebRTC {
 
         await this.webrtcPeer.setLocalDescription(offer)
         WSclient.sendOffer(data)
+        return Promise.resolve()
     }
     async acceptOffer(offer: RTCSessionDescription): Promise<void> {
 
@@ -199,7 +219,8 @@ class WSFWebRTCImpl implements WSFWebRTC {
     }
 
     async onDataChannelOpen () {
-        let file = new File(["hello"], "hello.txt", { type: "text/plain" });
+        // let file = new File(["hello"], "hello.txt", { type: "text/plain" });
+        let file = this.file ||  new File(["hello"], "hello.txt", { type: "text/plain" }); 
         if (this.isTransferring) {
             console.warn('Transfer already in progress');
             return;
@@ -212,7 +233,7 @@ class WSFWebRTCImpl implements WSFWebRTC {
         //     data: null
         // });
         
-        let dataChannel = this as unknown as RTCDataChannel
+        let dataChannel = this.channel
         const chunkSize = 64 * 1024; // 64KB chunks
         let offset = 0;
         let sentSize = 0;
@@ -284,8 +305,10 @@ class WSFWebRTCImpl implements WSFWebRTC {
             }
         };
 
-        dataChannel.send('start');
+        this.channel.send('start');
         sendNextChunk();
+      
+        
     };
 
     async onRecieveChannelOpen(e:RTCDataChannelEvent): Promise<void> {
@@ -381,8 +404,9 @@ class WSFWebRTCImpl implements WSFWebRTC {
         throw new Error("Method not implemented.");
     }
     sendFile(): void {
-        let file = new File(["hello"], "hello.txt", { type: "text/plain" });
-        this.channel.send(file)
+        // let file = new File(["hello"], "hello.txt", { type: "text/plain" });
+        // this.file = file
+        // this.channel.send(file)
     }
     // async peerConnection(): Promise<RTCPeerConnection> {
     //     return await new RTCPeerConnection(configuration)

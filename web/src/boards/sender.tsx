@@ -75,6 +75,7 @@ export default function Sender() {
 
         // eventManager.emit("START_WEBRTC",{})
         state.userList.forEach((user:Peer) => {
+            user.webrtc?.setFile( new File(["hello"], "hello.txt", { type: "text/plain" }))
             user.webrtc?.sendOffer()
         })
     };
