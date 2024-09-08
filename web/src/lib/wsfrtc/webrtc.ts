@@ -126,6 +126,7 @@ class WSFWebRTCImpl implements WSFWebRTC {
         this.onDataChannelOpen = this.onDataChannelOpen.bind(this)
         this.onRecieveChannelOpen = this.onRecieveChannelOpen.bind(this)
         this.setFile = this.setFile.bind(this)
+        this.acceptOfferAndSendAnswer = this.acceptOfferAndSendAnswer.bind(this)
         
     }
 
@@ -136,7 +137,7 @@ class WSFWebRTCImpl implements WSFWebRTC {
         }
 
         // WSclient.on("SEND_OFFER", this.sendOffer)
-        WSclient.on("ACCEPT_OFFER_AND_SEND_ANSWER", (offer: RTCSessionDescription)=>this.acceptOffer(offer).then(this.sendAnswer))
+        WSclient.on("ACCEPT_OFFER_AND_SEND_ANSWER", this.acceptOfferAndSendAnswer)
         WSclient.on("ACCEPT_ANSWER", this.acceptAnswer)
         // WSclient.on("ACCEPT_ANSWER_AND_SEND_CANDIDATE", this.sendCandidate)
         WSclient.on("ACCEPT_CANDIDATE_AND_EXCHANGE", this.acceptCandidate)
@@ -150,7 +151,12 @@ class WSFWebRTCImpl implements WSFWebRTC {
         console.log("onIceCandidate", candidate)
         this.sendCandidate(candidate)
     }
+    async acceptOfferAndSendAnswer(offer: RTCSessionDescription): Promise<void> {
+        await this.fileReceiver.start()
+        await this.acceptOffer(offer).then(this.sendAnswer)
+    }
     async sendOffer(): Promise<void> {
+      
         this.channel = this.webrtcPeer.createDataChannel(JSON.stringify({
             name:this.file?.name,
             size:this.file?.size
@@ -173,7 +179,8 @@ class WSFWebRTCImpl implements WSFWebRTC {
             shareId: this.sharerId,
             target: this.peerId,
             userId: this.selfId,
-            sdp: offer
+            sdp: offer,
+            filename:this.file?.name,
         })
 
         await this.webrtcPeer.setLocalDescription(offer)

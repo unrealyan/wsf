@@ -27,9 +27,11 @@ export default class LargeFileReceiver {
             });
             // 创建可写流
             this.writer = await this.fileHandle.createWritable();
+            // return Promise.resolve()
         } catch (err) {
             // console.error('Error starting file receiver:', err);
             // throw err;
+            // return Promise.reject(err)
         }
     }
 

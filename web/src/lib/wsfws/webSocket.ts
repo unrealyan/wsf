@@ -210,6 +210,9 @@ export class WSFWebSocket implements IWebSocket {
     }
 
 
+    sendInvite = (data:string) => {
+        this.ws?.send(data)
+    }
 
 }
 
