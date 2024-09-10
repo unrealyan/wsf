@@ -1,55 +1,96 @@
-name: Deploy to Server
+name: Build and Deploy
 
 on:
   push:
     branches: [ main ]
 
+env:
+  GO_VERSION: "1.21.13"
+
 jobs:
-  deploy:
+  build-backend:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Install ARM64 GCC
+        run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
+      - name: Build
+        run: |
+          go version
+          cd service
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 CC=aarch64-linux-gnu-gcc go build -o ../websf
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: websf-backend
+          path: websf
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v2
-      with:
-        node-version: '16'
+  build-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '16'
+      - name: Install dependencies and build
+        run: |
+          cd web
+          npm install
+          npm run build
+      - name: Compress dist folder
+        run: |
+          cd web
+          tar -czf ../websf-frontend.tar.gz -C dist .
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: websf-frontend
+          path: websf-frontend.tar.gz
 
-    - name: Set working directory and install dependencies
-      run: |
-        cd web
-        npm install
-
-    - name: Build project
-      run: |
-        cd web
-        npm run build
-
-    - name: Compress dist folder
-      run: |
-        cd web
-        tar -czf ../websf.tar.gz -C dist .
-
-    - name: Deploy to Server
-      uses: appleboy/scp-action@master
-      with:
-        host: ${{ secrets.HOST }}
-        username: ${{ secrets.USERNAME }}
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-        source: "websf.tar.gz"
-        target: "/tmp/"
-        overwrite: true
-
-    - name: Extract files on server and move to nginx directory
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ secrets.HOST }}
-        username: ${{ secrets.USERNAME }}
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-        script: |
-          sudo rm -rf /usr/share/nginx/html/websf
-          sudo mkdir -p /usr/share/nginx/html/websf
-          sudo tar -xzf /tmp/websf.tar.gz -C /usr/share/nginx/html/websf
-          sudo rm /tmp/websf.tar.gz
-          sudo chown -R nginx:nginx /usr/share/nginx/html/websf
-          sudo chmod -R 755 /usr/share/nginx/html/websf
+  deploy:
+    needs: [build-backend, build-frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download backend artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: websf-backend
+      - name: Download frontend artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: websf-frontend
+      - name: Deploy to Server
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "websf,websf-frontend.tar.gz"
+          target: "/tmp/"
+          overwrite: true
+      - name: Execute deployment commands
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            # Deploy backend
+            sudo mv /tmp/websf /usr/local/src/websf
+            sudo chmod +x /usr/local/src/websf
+            sudo systemctl restart websf.service
+            
+            # Deploy frontend
+            sudo rm -rf /usr/share/nginx/html/websf
+            sudo mkdir -p /usr/share/nginx/html/websf
+            sudo tar -xzf /tmp/websf-frontend.tar.gz -C /usr/share/nginx/html/websf
+            sudo rm /tmp/websf-frontend.tar.gz
+            sudo chown -R nginx:nginx /usr/share/nginx/html/websf
+            sudo chmod -R 755 /usr/share/nginx/html/websf
+            
+            echo "部署和重启服务完成"
