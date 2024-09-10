@@ -2,23 +2,21 @@ import { resolve } from "path"
 import { formatBytes } from "./fileUtil"
 import LargeFileReceiver from "./largeFileReceiver"
 import { ActionType, StateType } from "./store"
-import { rejects } from "assert"
 
 export interface WebRTCInterface {
     peerConnection: RTCPeerConnection
     dataChannel: RTCDataChannel
     servers: { iceServers: { urls: string[] }[] }
-    // ws: WebSocket
+    ws: WebSocket
     userId: string
     file: File | null
     fileReceiver: LargeFileReceiver
-    // createPeerConnection: (targetUserId: string, sender: boolean, store: any) => void
-    createOffer: () => Promise<any>
-    createAnswer: () => Promise<any>
-    // createAnswer: (targetUserId: string, offer: RTCSessionDescriptionInit, setStore: any) => void
+    createPeerConnection: (targetUserId: string, sender: boolean, store: any) => void
+    createOffer: (targetUserId: string, state: StateType, action: ActionType) => void
+    createAnswer: (targetUserId: string, offer: RTCSessionDescriptionInit, setStore: any) => void
     addAnswer: (answer: RTCSessionDescriptionInit) => void
     addIceCandidates: (candidate?: RTCIceCandidateInit) => void
-    // downloadFile: (blob: Blob, fileName: string) => void
+    downloadFile: (blob: Blob, fileName: string) => void
 }
 
 interface ProgressEvent {
@@ -27,13 +25,13 @@ interface ProgressEvent {
     speed?: number; // 传输速度 (bytes/second)
 }
 
-export default class WebRTCImpl implements WebRTCInterface {
+export default class WebRTC implements WebRTCInterface {
     peerConnection!: RTCPeerConnection
     recieveChannel!: RTCDataChannel
     dataChannel!: RTCDataChannel
     iceServers!: RTCIceServer[]
     servers: { iceServers:  any}
-    // ws: WebSocket;
+    ws: WebSocket;
     userId!: string
     file!: File
     fileReceiver: LargeFileReceiver
@@ -48,7 +46,7 @@ export default class WebRTCImpl implements WebRTCInterface {
     private isReceiving: boolean = false;
     private messageHandler: ((e: MessageEvent) => void) | null = null;
 
-    constructor() {
+    constructor(ws: WebSocket) {
         this.servers = {
             iceServers: [
                 {
@@ -71,7 +69,6 @@ export default class WebRTCImpl implements WebRTCInterface {
         this.peerConnection = new RTCPeerConnection(this.servers);
         this.peerConnection.oniceconnectionstatechange = e => console.log(this.peerConnection.iceConnectionState);
         this.peerConnection.onicecandidate = event => {
-            console.log(event)
             if (event.candidate) {
                 console.log("New ICE candidate: " + JSON.stringify(event.candidate));
             }
@@ -80,9 +77,9 @@ export default class WebRTCImpl implements WebRTCInterface {
             this.dispatch('Connection state:' + this.peerConnection.connectionState)
             console.log('Connection state:', this.peerConnection.connectionState);
         });
-        // this.ws = ws;
+        this.ws = ws;
         this._onmessage = (event: any) => { }
-        this.fileReceiver = new LargeFileReceiver("test2")
+        this.fileReceiver = new LargeFileReceiver("test")
     }
 
     get onmessage() {
@@ -106,32 +103,37 @@ export default class WebRTCImpl implements WebRTCInterface {
         }
     }
 
-    createOffer = async () =>{   
-        try {
-            await this.listenPeerConnection()
-            let offer = await this.peerConnection.createOffer();
-            await this.peerConnection.setLocalDescription(offer);
-            console.log("Offer created and set as local description.");
-            return Promise.resolve(offer)
-        } catch (error) {
-             console.error("Error creating offer:", error);
-            return  Promise.reject(error)
-        }
+    createOffer = async (targetUserId: string, store: any, setStore: any) => {
+        this.file = store.file
+        this.userId = store.userId
+        let { createPeerConnection, peerConnection, ws, userId } = this
+        createPeerConnection(targetUserId, true, store);
+
+        let offer = await peerConnection.createOffer();
+        console.log("created-offer");
+        await peerConnection.setLocalDescription(offer);
+        ws.send(JSON.stringify({
+            name: userId,
+            target: targetUserId,
+            type: "offer",
+            sdp: offer
+        }));
     }
 
-    createAnswer = async () =>{   
-        try {
-            await this.listenPeerConnection()
-            let offer = await this.peerConnection.createOffer();
-            await this.peerConnection.setRemoteDescription(offer);
-            let answer = await this.peerConnection.createAnswer();
-            await this.peerConnection.setLocalDescription(answer);
-            console.log("created-answer");
-            return Promise.resolve(answer)
-        } catch (error) {
-            console.log("error",error)
-            return  Promise.reject(error)
-        }
+    createAnswer = async (targetUserId: string, offer: RTCSessionDescriptionInit, setStore: any) => {
+        let { createPeerConnection, peerConnection, ws, userId } = this
+        createPeerConnection(targetUserId, false, setStore);
+        await peerConnection.setRemoteDescription(offer).catch((e) => console.log(e));
+
+        let answer = await peerConnection.createAnswer();
+        console.log("created-answer");
+        await peerConnection.setLocalDescription(answer);
+        ws.send(JSON.stringify({
+            name: userId,
+            target: targetUserId,
+            type: "answer",
+            sdp: answer
+        }));
     }
 
     addAnswer = async (answer: RTCSessionDescriptionInit) => {
@@ -148,21 +150,22 @@ export default class WebRTCImpl implements WebRTCInterface {
         console.log("counterpart's-ice-candidates-added");
     };
 
-
-    listenPeerConnection = async (sender=false)=>{
-        let { peerConnection, recieveChannel } = this
-        peerConnection.addEventListener("icecandidate", (e) => {
+    createPeerConnection = (targetUserId: string, sender = false, store: any) => {
+        let { peerConnection, recieveChannel, ws, openDataChannel } = this
+        this.peerConnection.addEventListener("icecandidate", (e) => {
             if (e.candidate) {
-                this.dispatch({
-                    type:"icecandidate",
+                ws.send(JSON.stringify({
+                    type: "new-ice-candidate",
+                    target: targetUserId,
                     candidate: e.candidate
-                })
+                }));
             }
         });
 
         if (sender) {
-            this.openDataChannel();
+            openDataChannel();
         }
+
         peerConnection.addEventListener("datachannel", (e) => {
             recieveChannel = e.channel;
 
@@ -251,7 +254,7 @@ export default class WebRTCImpl implements WebRTCInterface {
                 this.isReceiving = false;
             });
         });
-    }
+    };
 
     openDataChannel = () => {
         let { peerConnection, dataChannel, file } = this
@@ -358,5 +361,25 @@ export default class WebRTCImpl implements WebRTCInterface {
         });
     }
 
-   
+    downloadFile = (blob: Blob, fileName: string) => {
+        const a = document.createElement('a');
+        const url = window.URL.createObjectURL(blob);
+        a.href = url;
+        a.download = fileName;
+        a.click();
+        window.URL.revokeObjectURL(url);
+        a.remove();
+    };
+
+    async createWritableStream(fileName: string) {
+        try {
+            const handle = await (window as any).showSaveFilePicker({
+                suggestedName: fileName,
+            });
+            return await handle.createWritable();
+        } catch (err) {
+            console.error('Error creating writable stream:', err);
+            throw err;
+        }
+    }
 }

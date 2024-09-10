@@ -1,0 +1,41 @@
+stages:
+  - build
+  - deploy
+
+variables:
+  GO_VERSION: "1.21.13"
+
+build:
+  stage: build
+  image: golang:1.21.13-bullseye
+  before_script:
+    - apt-get update && apt-get install -y gcc-aarch64-linux-gnu
+  script:
+    - go version
+    - cd service
+    - CGO_ENABLED=0 GOOS=linux GOARCH=arm64 CC=aarch64-linux-gnu-gcc go build -o ../websf
+  artifacts:
+    paths:
+      - websf
+
+deploy:
+  stage: deploy
+  image: ubuntu:latest
+  before_script:
+    - apt-get update && apt-get install -y openssh-client
+    - eval $(ssh-agent -s)
+    - echo "正在添加 SSH 私钥..."
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add - || (echo "SSH 私钥添加失败" && exit 1)
+    - echo "SSH 私钥添加成功"
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - echo "StrictHostKeyChecking no" >> ~/.ssh/config
+  script:
+    - echo "开始 SCP 传输..."
+    - scp -v websf $REMOTE_USER@$REMOTE_HOST:/tmp/websf || (echo "SCP 传输失败" && exit 1)
+    - echo "SCP 传输成功"
+    - ssh $REMOTE_USER@$REMOTE_HOST "sudo mv /tmp/websf /usr/local/src/websf && sudo chmod +x /usr/local/src/websf"
+    - ssh $REMOTE_USER@$REMOTE_HOST "sudo systemctl restart websf.service"
+    - echo "部署和重启服务完成"
+  only:
+    - hey

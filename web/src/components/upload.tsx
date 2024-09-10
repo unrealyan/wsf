@@ -1,7 +1,11 @@
-import { createEffect, onMount } from "solid-js"
+import { createEffect, createSignal, onMount } from "solid-js"
 import { formatBytes } from "../lib/fileUtil";
+import { useStore,UploadStoreManager } from "../lib/store";
+import eventManager, { EventManager } from '../lib/eventManager';
 
-function Upload(props: any) {
+function Upload(props:any) {
+    const [state,action] = useStore()
+    const[ ,]= createSignal(new UploadStoreManager(state,action))
     let drapRef: HTMLDivElement
 
     createEffect(() => {
@@ -14,7 +18,14 @@ function Upload(props: any) {
 
     const change = (event: any) => {
         let files = event.currentTarget.files
-        props.setStore("file", () => files[0])
+        // props.setStore("file", () => files[0])
+        props.onFileUpload(files)
+        // eventManager.emit("CHANGE_FILES",files[0])
+        action.setFile(files[0])
+        // action.setUserList(state.userList.map(user=>{
+        //     let nuser = {...user,filename:files[0].name}
+        //     return nuser
+        // }))
     }
 
     const dragStart = (event: any) => {
@@ -38,7 +49,14 @@ function Upload(props: any) {
                 if (item.kind === "file") {
                     const file = item.getAsFile();
                     console.log(`… file[${i}].name = ${file.name}`);
-                    props.setStore("file", () => file)
+                    // props.setStore("file", () => file)
+                    // action.setFile(file)
+                    // action.setUserList(state.userList.map((user:any)=>{
+                    //     user.filename=file.name
+                    //     return user
+                    // }))
+                   eventManager.emit("CHANGE_FILES",file)
+                   
                 }
             });
 
@@ -46,15 +64,16 @@ function Upload(props: any) {
     }
 
     const deleteFile = () =>{
-        props.setStore("file", () => null)
+        // props.setStore("file", () => null)
+        action.setFile(null)
     }
 
     return (
         <div class="col-span-full w-[90%] bg-white p-10 mt-8 md:mt-0 mr-auto ml-auto rounded">
             <label for="cover-photo" class="block font-medium leading-6 text-gray-900 text-2xl m-10">WebRTC File Sharing</label>
             <div data-progress="45%" class="m-4 flex justify-center rounded-lg border border-dashed border-gray-900/25 px-6 py-6 relative" ref={el => drapRef=el}>
-                {props.store.file ? <div class="hover:cursor-pointer hover:text-gray-200" onClick={deleteFile} title="remove">
-                    <p class="h-12 flex justify-center items-center">{props.store.file.name}<span class="text-gray-400 ml-4">{formatBytes(props.store.file?.size||0)}</span></p>
+                {state.file ? <div class="hover:cursor-pointer hover:text-gray-200" onClick={deleteFile} title="remove">
+                    <p class="h-12 flex justify-center items-center">{state.file.name}<span class="text-gray-400 ml-4">{formatBytes(state.file?.size||0)}</span></p>
                     
 
                 </div> :

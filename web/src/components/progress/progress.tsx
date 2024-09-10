@@ -13,30 +13,26 @@ interface ProgressBarProps {
     ref:any
 }
 
+export interface UserProgressRef {
+    status: () => boolean;
+    open: () => void;
+    close: () => void;
+    setValue: (val: number) => void;
+    setSpeed: (val: string) => void;
+    setDone: (val: boolean) => void;
+  }
+  
+
 const ProgressBar: (props: ProgressBarProps) => JSX.Element = (props) => {
     const [packets, setPackets] = createSignal<Packet[]>([]);
     const [lastProgress, setLastProgress] = createSignal(0);
     const [progress, setProgress] = createSignal(0);
-    const [status, setStatus] = createSignal(false);
+    const [status, setStatus] = createSignal(true);
     const [speed, setSpeed] = createSignal("");
     const [done, setDone] = createSignal(false);
 
-    let nextPacketId = 0;
 
-    const createPacket = () => {
 
-        const newPacket: Packet = {
-            id: nextPacketId++,
-            active: true
-        };
-
-        setPackets(prev => [...prev, newPacket]);
-
-        // Remove packet after animation
-        setTimeout(() => {
-            setPackets(prev => prev.filter(p => p.id !== newPacket.id));
-        }, 1350); // Slightly longer than the total animation duration
-    }
     props.ref({
         status:status,
         open: () => setStatus(true),
@@ -46,21 +42,11 @@ const ProgressBar: (props: ProgressBarProps) => JSX.Element = (props) => {
         setDone:(val:boolean) => setDone(val)
     })
 
-    // createEffect(() => {
-    //     const currentProgress = progress();
-    //     if (currentProgress > lastProgress()) {
-    //         for (let i = lastProgress(); i < currentProgress; i++) {
-    //             createPacket();
-    //         }
-    //         setLastProgress(currentProgress);
-    //     }
-    // });
-
-
     return (
         <>
             {status() && (
                 <div id="progress-container" class="bg-white p-4 rounded-lg shadow-md border border-gray-200">
+                    <div class="font-semibold text-lg text-gray-800">FileName: <span class="text-gray-600">{props.filename}</span></div>
                     <div class="flex items-center justify-between mb-2">
                         <span class="font-semibold text-lg text-gray-800">progress</span>
                         <span class="text-gray-600">{speed()}</span>
