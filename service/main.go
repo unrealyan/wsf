@@ -67,7 +67,7 @@ func main() {
 
 	http.HandleFunc("/ws", handleWebSocket)
 
-	// go broadcastStats()
+	go broadcastStats()
 
 	log.Printf("WebSocket server listening on %d", WEBSOCKET_SERVER_PORT)
 	if err := http.ListenAndServe(fmt.Sprintf(":%d", WEBSOCKET_SERVER_PORT), nil); err != nil {
