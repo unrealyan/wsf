@@ -28,7 +28,21 @@ const configuration: RTCConfiguration = {
     iceServers: [
         {
             urls: [
-                "stun:stun.l.google.com:19302"
+                "stun:stun.l.google.com:19302",
+                'stun:stun.nextcloud.com:3478',
+                'stun:fwa.lifesizecloud.com:3478',
+                "stun:meet-jit-si-turnrelay.jitsi.net:443",
+                "stun:global.stun.twilio.com",
+                "stun:sg1.stun.twilio.com",
+                "stun:us1.stun.twilio.com",
+                "stun:us2.stun.twilio.com",
+                "stun:stun.cloudflare.com",
+                "stun:stun.miwifi.com",
+                "stun:39.107.142.158",
+                "stun:hw-v2-web-player-tracker.biliapi.net",
+                "stun:stun.smartgslb.com:19302"
+
+
             ]
         }
     ]
