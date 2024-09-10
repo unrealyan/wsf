@@ -1,4 +1,5 @@
 import WSclient from "../../lib/wsfws/webSocket";
+import { formatBytes } from "../fileUtil";
 import LargeFileReceiver from "../largeFileReceiver";
 
 export interface WSFWebRTC {
@@ -6,6 +7,8 @@ export interface WSFWebRTC {
     peerId: string
     sharerId: string
     file:File | null
+    fileReceiver: LargeFileReceiver
+    sendSize: number
     // peerConnection(): RTCPeerConnection
     onIceCandidate(candidate: RTCIceCandidate): void
     sendOffer(): Promise<void>
@@ -14,9 +17,10 @@ export interface WSFWebRTC {
     acceptAnswer(answer: RTCSessionDescription): void
     sendCandidate(candidate: RTCIceCandidate): void
     acceptCandidate(candidate: RTCIceCandidate): void
-    setFile(file:File): void
+    setFile(file:File|null): void
     sendFile(): void
     bindEvents(): void
+    setReceiverFile(filename:string):void
 
 }
 
@@ -37,6 +41,7 @@ class WSFWebRTCImpl implements WSFWebRTC {
     selfId!: string;
     sharerId!: string;
     role:string;
+    sendSize: number = 0
     private receivedSize: number = 0
     private startTime: number = 0
     private lastUpdateTime: number = 0
@@ -48,17 +53,17 @@ class WSFWebRTCImpl implements WSFWebRTC {
     private messageHandler: ((e: MessageEvent) => void) | null = null;
     private fileWriter: FileSystemWritableFileStream | null = null
     file!: File | null;
+    private _onmessage: (event: any) => void;
 
     constructor({ role,peerId, sharerId, selfId }: WSFWebRTCType) {
-        console.log("connectWebRTC", peerId, sharerId)
-        console.log(peerId, sharerId)
+
         this.role =role
         this.peerId = peerId
         this.selfId = selfId
         this.sharerId = sharerId
         this.webrtcPeer = new RTCPeerConnection(configuration)
         this.fileReceiver = new LargeFileReceiver("test")
-        
+        this._onmessage = (event: any) => { }
         if (role === "sender") {
             this.channel?.addEventListener("open", this.onDataChannelOpen)
         } else if (role === "receiver") {
@@ -131,7 +136,7 @@ class WSFWebRTCImpl implements WSFWebRTC {
     }
 
     bindEvents(): void {
-        console.log("bindEvents")
+
         this.webrtcPeer.oniceconnectionstatechange = event => {
             console.log("ICE connection state changed:", event);
         }
@@ -143,16 +148,22 @@ class WSFWebRTCImpl implements WSFWebRTC {
         WSclient.on("ACCEPT_CANDIDATE_AND_EXCHANGE", this.acceptCandidate)
     }
 
+    setReceiverFile(filename: string): void {
+        this.fileReceiver = new LargeFileReceiver(filename)
+    }
+
     setFile(file: File): void {
-        this.file = file;
+        if (file){
+            this.file = file;
+        }
     }
 
     onIceCandidate(candidate: RTCIceCandidate): void {
-        console.log("onIceCandidate", candidate)
+
         this.sendCandidate(candidate)
     }
     async acceptOfferAndSendAnswer(offer: RTCSessionDescription): Promise<void> {
-        await this.fileReceiver.start()
+        // await this.fileReceiver.start()
         await this.acceptOffer(offer).then(this.sendAnswer)
     }
     async sendOffer(): Promise<void> {
@@ -227,7 +238,7 @@ class WSFWebRTCImpl implements WSFWebRTC {
 
     async onDataChannelOpen () {
         // let file = new File(["hello"], "hello.txt", { type: "text/plain" });
-        let file = this.file ||  new File(["hello"], "hello.txt", { type: "text/plain" }); 
+        let file = this.file ||  new File(["hello"], "hello2.txt", { type: "text/plain" }); 
         if (this.isTransferring) {
             console.warn('Transfer already in progress');
             return;
@@ -243,7 +254,7 @@ class WSFWebRTCImpl implements WSFWebRTC {
         let dataChannel = this.channel
         const chunkSize = 64 * 1024; // 64KB chunks
         let offset = 0;
-        let sentSize = 0;
+        this.sendSize = 0;
         let startTime = Date.now();
         let lastUpdateTime = startTime;
         let lastReceivedSize = 0;
@@ -254,10 +265,16 @@ class WSFWebRTCImpl implements WSFWebRTC {
             if (offset >= file.size) {
                 dataChannel.send('done');
                 // this message for sender
-                // this.dispatch({
-                //     type: "fileReceived",
-                //     data: { name: file.name, size: file.name }
-                // });
+                this.dispatch({
+                    type: "fileReceived",
+                    data: { 
+                        progress:100,
+                        receiverSize: this.sendSize,
+                        fileSize: file.size,
+                        user:"sender",
+                        peerId:this.peerId
+                    }
+                });
                 return;
             }
 
@@ -278,33 +295,43 @@ class WSFWebRTCImpl implements WSFWebRTC {
         };
 
         const sendChunk = (chunk: ArrayBuffer) => {
-
+            console.log('sendChunk',offset,chunk.byteLength)
             dataChannel.send(chunk);
             offset += chunk.byteLength;
-            sentSize += chunk.byteLength;
+            this.sendSize  += chunk.byteLength;
 
-            const progress = Math.ceil(sentSize / (file.size / 100));
+            const progress = Math.ceil(this.sendSize  / (file.size / 100));
             const currentTime = Date.now();
             const elapsedTime = (currentTime - lastUpdateTime) / 1000; // 转换为秒
             
             if (elapsedTime >= 1) { // 每秒更新一次速度
-                const speed = (sentSize - lastReceivedSize) / elapsedTime;
-                // this.dispatch({
-                //     type: "progress",
-                //     data: progress,
-                //     user:"sender",
-                //     speed: formatBytes(speed)+"/s"
-                // });
+                const speed = (this.sendSize  - lastReceivedSize) / elapsedTime;
+                this.dispatch({
+                    type: "progress",
+                    data: {
+                        progress,
+                        receiverSize: this.sendSize,
+                        fileSize: file.size,
+                        user:"sender",
+                        peerId:this.peerId,
+                        speed: formatBytes(speed)+"/s"
+                    }
+                });
                 lastUpdateTime = currentTime;
-                lastReceivedSize = sentSize;
+                lastReceivedSize = this.sendSize ;
             } else {
-                const speed = (sentSize - lastReceivedSize) / elapsedTime;
-                // this.dispatch({
-                //     type: "progress",
-                //     data: progress,
-                //     user:"sender",
-                //     speed: formatBytes(speed)+"/s"
-                // });
+                const speed = (this.sendSize  - lastReceivedSize) / elapsedTime;
+                this.dispatch({
+                    type: "progress",
+                    data: {
+                        progress,
+                        receiverSize: this.sendSize,
+                        fileSize: file.size,
+                        user:"sender",
+                        peerId:this.peerId,
+                        speed: formatBytes(speed)+"/s"
+                    }
+                });
             }
 
             if (offset <= file.size) {
@@ -344,6 +371,18 @@ class WSFWebRTCImpl implements WSFWebRTC {
                     this.startTime = Date.now();
                     this.lastUpdateTime = this.startTime;
                     this.lastReceivedSize = 0;
+                    this.dispatch({
+                        type: "transferStart",
+                        data: {
+                            progress:0,
+                            receiverSize: this.sendSize,
+                            filename: fileInfo.name,
+                            fileSize: fileInfo.size,
+                            user:"sender",
+                            peerId:this.peerId,
+                            speed: formatBytes(0)+"/s"
+                        }
+                    });
                 } else if (data === 'done') {
                     if (this.messageHandler) {
                         recieveChannel.removeEventListener("message", this.messageHandler);
@@ -354,9 +393,21 @@ class WSFWebRTCImpl implements WSFWebRTC {
                     this.fileWriter = null;
                     console.log('File received, size:', this.receivedSize);
                     await fileReceiver.finish();
+                    // this.dispatch({
+                    //     type: "fileReceived",
+                    //     data: { name: fileInfo.name, size: this.receivedSize }
+                    // });
                     this.dispatch({
                         type: "fileReceived",
-                        data: { name: fileInfo.name, size: this.receivedSize }
+                        data: {
+                            progress:100,
+                            receiverSize: this.sendSize,
+                            filename: fileInfo.name,
+                            fileSize: fileInfo.size,
+                            user:"sender",
+                            peerId:this.peerId,
+                            speed: formatBytes(0)+"/s"
+                        }
                     });
                     this.isReceiving = false;
                 } else {
@@ -369,22 +420,35 @@ class WSFWebRTCImpl implements WSFWebRTC {
                     
                     if (elapsedTime >= 1) { // 每秒更新一次速度
                         const speed = (this.receivedSize - this.lastReceivedSize) / elapsedTime;
-                        // this.dispatch({
-                        //     type: "progress",
-                        //     user:"receiver",
-                        //     data: progress,
-                        //     speed: formatBytes(speed)+"/s"
-                        // });
+                        console.log(speed)
+                        this.dispatch({
+                            type: "progress",
+                            data: {
+                                progress,
+                                receiverSize: this.sendSize,
+                                filename: fileInfo.name,
+                                fileSize: fileInfo.size,
+                                user:"sender",
+                                peerId:this.peerId,
+                                speed: formatBytes(speed)+"/s"
+                            }
+                        });
                         this.lastUpdateTime = currentTime;
                         this.lastReceivedSize = this.receivedSize;
                     } else {
                         const speed = (this.receivedSize - this.lastReceivedSize) / elapsedTime;
-                        // this.dispatch({
-                        //     type: "progress",
-                        //     user:"receiver",
-                        //     data: progress,
-                        //     speed: formatBytes(speed)+"/s"
-                        // });
+                        this.dispatch({
+                            type: "progress",
+                            data: {
+                                progress,
+                                receiverSize: this.sendSize,
+                                filename: fileInfo.name,
+                                fileSize: fileInfo.size,
+                                user:"sender",
+                                peerId:this.peerId,
+                                speed: formatBytes(speed)+"/s"
+                            }
+                        });
                     }
                 }
             };
@@ -407,8 +471,25 @@ class WSFWebRTCImpl implements WSFWebRTC {
                 this.isReceiving = false;
             });
     }
-    dispatch(arg0: { type: string; data: { name: string; size: number; }; }) {
-        throw new Error("Method not implemented.");
+    get onmessage() {
+        return this._onmessage;
+    }
+
+    set onmessage(handler) {
+        if (typeof handler === 'function' || handler === null) {
+            this._onmessage = handler;
+        } else {
+            throw new Error('Message handler must be a function or null');
+        }
+    }
+
+    dispatch = <T>(data: T) => {
+        if (typeof this.onmessage === 'function') {
+            const event = data;
+            this.onmessage(event);
+        } else {
+            console.warn('No message handler set. Use object.onmessage to set a handler.');
+        }
     }
     sendFile(): void {
         // let file = new File(["hello"], "hello.txt", { type: "text/plain" });

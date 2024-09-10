@@ -13,6 +13,8 @@ import { WSFWebRTC } from './wsfrtc/webrtc';
 export interface User {
   id: string;
   filename: string;
+  fileSize:number,
+  handleFileSize: number;
   progress: number;
   speed: number;
   start: boolean;
@@ -22,6 +24,9 @@ export interface User {
 export interface Peer {
   id: string;
   filename: string;
+  fileSize:number,
+  handleFileSize: number;
+  receiverSize: number;
   progress: number;
   speed: number;
   start: boolean;
@@ -107,6 +112,8 @@ export default function StoreProvider(props: any) {
     sender: {
       id: "",
       filename: '',
+      fileSize:0,
+      handleFileSize: 0,
       progress: 0,
       speed: 0,
       start: false
@@ -114,6 +121,8 @@ export default function StoreProvider(props: any) {
     reciever: {
       id: "",
       filename: '',
+      fileSize:0,
+      handleFileSize: 0,
       progress: 0,
       speed: 0,
       start: false
@@ -210,9 +219,12 @@ export class StoreManager {
   private handleSetReceivers(userIds: string[]) {
 
     let users = userIds.map((id: string) => {
-      let user: User = {
+      let user: Peer = {
         id,
         filename: "",
+        fileSize:0,
+        handleFileSize: 0,
+        receiverSize:0,
         start: false,
         progress: 0,
         speed: 0

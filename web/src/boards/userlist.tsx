@@ -3,10 +3,11 @@ import UserItem from "../components/userItem";
 import WebRTCImpl from '../lib/webrtc';
 import { createStore } from "solid-js/store";
 import WebSocketClient, { StoreType } from "../lib/webSocket";
-import { useStore } from "../lib/store";
+import { Peer, useStore } from "../lib/store";
+import {WSFWebRTC} from "../lib/wsfrtc/webrtc";
 
 interface UserListContainerProps {
-    userList: User[];
+    userList: Peer[];
     // store: StoreType;
 }
 export interface User {
@@ -15,10 +16,11 @@ export interface User {
     progress: number;
     speed: number;
     start: boolean;
-    webrtc?: WebRTCImpl | null
+    receiverSize:number;
+    webrtc?: WSFWebRTC | null
 }
 interface UserListStore {
-    userList: User[]
+    userList: Peer[]
 }
 export default function UserListContainer(props: UserListContainerProps) {
     const [state, action] = useStore()
@@ -27,7 +29,7 @@ export default function UserListContainer(props: UserListContainerProps) {
 
     createEffect(() => {
 
-        let userlist: User[] = state.userList.map((user: User) => {
+        let userlist: Peer[] = state.userList.map((user: Peer) => {
             let storeUser = store.userList.find(su => su.id === user.id);
 
             // 如果用户不存在于列表中，添加新用户
@@ -36,6 +38,7 @@ export default function UserListContainer(props: UserListContainerProps) {
                 return {
                     ...user,
                     filename: state.file?.name || "",
+                    fileSize: state.file?.size || 0,
                 };
             }
             return storeUser; // 返回已存在的用户
@@ -43,10 +46,10 @@ export default function UserListContainer(props: UserListContainerProps) {
 
         // 找出在 store.userList 中但不在 props.userList 中的用户
         const removedUsers = store.userList.filter(storeUser =>
-            !state.userList.map((user: User) => user.id).includes(storeUser.id)
+            !state.userList.map((user: Peer) => user.id).includes(storeUser.id)
         );
         // 处理移除的用户（例如，可以在这里更新状态）
-        userlist = userlist?.filter((user: User) => {
+        userlist = userlist?.filter((user: Peer) => {
             if (!removedUsers.includes(user)) { return true }
         }) ?? [];
 
@@ -92,11 +95,14 @@ export default function UserListContainer(props: UserListContainerProps) {
     }
 
     return <For each={props.userList} fallback={<div>Loading...</div>}>
-        {(user: User, index) => <UserItem
+        {(user: Peer, index) => <UserItem
             key={`${user.id}-${user.filename}-${index()}`}
             userId={user.id}
             filename={user.filename}
             progress={user.progress}
+            fileSize={user.fileSize}
+            handleFileSize={user.handleFileSize}
+            receiverSize={user.receiverSize}
             speed={user.speed}
         />}
     </For>

@@ -31,7 +31,7 @@ export class WSFWebSocket implements IWebSocket {
 
     constructor() {
 
-        console.log("new websocket")
+
         let shareId = sessionStorage.getItem("shareId") || "";
         const urlShareId = urlSP.get("s") || "";
         this.role = urlShareId ? "receiver" : "sender"
@@ -92,8 +92,7 @@ export class WSFWebSocket implements IWebSocket {
             switch (data.type) {
                 case "user-id":
 
-                    // this.eventManager.emit("SET_USER_ID",data.userId)
-                    // this.eventManager.emit("SET_SHARE_ID",data.shareId)
+
                     this.sendRole(data.shareId, data.userId)
                     this.emit("SET_SHARE_ID", data.shareId)
 
@@ -103,11 +102,11 @@ export class WSFWebSocket implements IWebSocket {
 
                     break;
                 case "stats":
-                    // this.eventManager.emit("SET_STATS",{totalFiles:data.totalFiles,totalSize:data.totalSize})
+                    this.emit("GET_STATISTICS",{totalFiles:data.totalFiles,totalSize:data.totalSize})
                     break;
 
                 case "all-receivers":
-                    // this.eventManager.emit("SET_RECEIVERS",data.userIds||[])
+
 
                     this.emit("ALL_RECEIVERS", data.userIds || [])
                     // this.emit("INITIATE",data)
@@ -117,22 +116,28 @@ export class WSFWebSocket implements IWebSocket {
                     break;
                 case "notice":
                     this.emit("INIT_RECEIVER", data)
+                    
+                    break;
+                case "request-status":
+                     this.emit("ACCEPT", data)
+                    break;
+                case "accept-request":
+                     this.emit("SEND_FILE",data)
                     break;
                 case "offer":
-                    // this.eventManager.emit("SET_RECEIVER_ID",data.name)
-                    // this.eventManager.emit("GET_OFFER",data.sdp)
+
 
                     // new code
-                    console.log("offer", data)
-                    this.emit("ACCEPT_OFFER_AND_SEND_ANSWER", data.sdp)
+
+                     this.emit("ACCEPT_OFFER_AND_SEND_ANSWER", data.sdp)
                     // this.emit("GET_TARGET_ID",data.userId)
                     // this.emit("GET_SHARE_ID",data.shareId)
 
                     break;
                 case "answer":
-                    // this.eventManager.emit("GET_ANSWER",data.sdp)
+
                     // new code
-                    console.log("answer", data)
+
                     // this.emit("ACCEPT_ANSWER_AND_SEND_CANDIDATE", data)
                     this.emit("ACCEPT_ANSWER", data.sdp)
                     // this.emit("GET_ANSWER",data.sdp)
@@ -140,7 +145,7 @@ export class WSFWebSocket implements IWebSocket {
                 case "new-ice-candidate":
                     const candidate = new RTCIceCandidate(data.candidate);
                     this.emit("ACCEPT_CANDIDATE_AND_EXCHANGE",candidate)
-                    // this.eventManager.emit("SAVE_ICE_CANDIDATE",candidate)
+
                     break;
             }
         }
@@ -153,7 +158,6 @@ export class WSFWebSocket implements IWebSocket {
 
     };
     sendCandidate = (data: string) => {
-        console.log("sendCandidate", data)
         this.ws.send(data);
     };
     sendProgress = (data: string) => {
@@ -187,6 +191,18 @@ export class WSFWebSocket implements IWebSocket {
         }));
     }
 
+    sendShareFileInfo = ({senderId, sharerId,receiverId,filename,fileSize}:any)=>{
+
+        this.ws?.send(JSON.stringify({
+            type: "request-status",
+            sharerId,
+            target:receiverId,
+            userId:senderId,
+            filename,
+            fileSize
+        }));
+    }
+
     sendUserToReceiver = (user: string, shareId: string, userIds: string[]) => {
 
         userIds.forEach((userId: string) => {
@@ -200,6 +216,18 @@ export class WSFWebSocket implements IWebSocket {
         })
     }
 
+    acceptFile = ({senderId, sharerId,receiverId,filename,fileSize}:any)=>{
+
+        this.ws?.send(JSON.stringify({
+            type: "accept-request",
+            sharerId,
+            target:receiverId,
+            userId:senderId,
+            filename,
+            fileSize
+        }));
+    }
+
     sendOffer = (data: string) => {
         this.ws?.send(data);
     }
@@ -210,9 +238,6 @@ export class WSFWebSocket implements IWebSocket {
     }
 
 
-    sendInvite = (data:string) => {
-        this.ws?.send(data)
-    }
 
 }
 

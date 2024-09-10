@@ -1,3 +1,5 @@
+
+
 export default class LargeFileReceiver {
     private fileHandle: FileSystemFileHandle | null;
     private writer: FileSystemWritableFileStream | null;
@@ -5,6 +7,7 @@ export default class LargeFileReceiver {
     private suggestedName: string;
     fileDataArray: ArrayBuffer[];
     fileInfo: { name: string; size: number; };
+    private isFilePickerActive: boolean = false;
 
 
     constructor(suggestedName: string) {
@@ -20,8 +23,13 @@ export default class LargeFileReceiver {
     }
 
     public async start(): Promise<void> {
+        if (this.isFilePickerActive) {
+            console.log("File picker is already active. Please wait.");
+            return;
+          }
         try {
             // 请求用户选择保存文件的位置
+            this.isFilePickerActive = true
             this.fileHandle = await window.showSaveFilePicker({
                 suggestedName: this.suggestedName
             });
@@ -29,7 +37,7 @@ export default class LargeFileReceiver {
             this.writer = await this.fileHandle.createWritable();
             // return Promise.resolve()
         } catch (err) {
-            // console.error('Error starting file receiver:', err);
+            console.error('Error starting file receiver:', err);
             // throw err;
             // return Promise.reject(err)
         }
@@ -70,6 +78,7 @@ export default class LargeFileReceiver {
                 throw err;
             } finally {
                 this.writer = null;
+                this.isFilePickerActive = false
             }
         } else {
             const blob = new Blob(this.fileDataArray);
