@@ -50,12 +50,11 @@ function Upload(props:any) {
                     const file = item.getAsFile();
                     console.log(`… file[${i}].name = ${file.name}`);
                     // props.setStore("file", () => file)
-                    // action.setFile(file)
+                    action.setFile(file)
                     // action.setUserList(state.userList.map((user:any)=>{
                     //     user.filename=file.name
                     //     return user
                     // }))
-                   eventManager.emit("CHANGE_FILES",file)
                    
                 }
             });
