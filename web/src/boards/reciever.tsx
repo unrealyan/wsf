@@ -64,7 +64,7 @@ export default function Receiver(props: any) {
     const onAccept = async () => {
 
         webRTCReceiver()?.setReceiverFile(state.reciever.filename)
-        await webRTCReceiver()?.fileReceiver?.start()
+        // await webRTCReceiver()?.fileReceiver?.start()
         WSClient.acceptFile({
             senderId: state.userId,
             receiverId: state.targetId,
