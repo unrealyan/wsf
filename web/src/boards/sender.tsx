@@ -95,6 +95,7 @@ export default function Sender() {
 
     const getShareId = (id:string) => {
         action.setShareId(id)
+        sessionStorage.setItem("shareId",id)
     }
 
     const handleFileUpload = (uploadedFiles: File[]) => {
