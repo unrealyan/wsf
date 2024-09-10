@@ -33,6 +33,7 @@ export default function Receiver(props: any) {
     }
 
     const onInitReceiver = (data: any) => {
+        console.log(data)
         Promise.all([action.setUserId(data.target), action.setTargetId(data.userId), action.setShareId(data.shareId)]).then(() => {
             let webrtc = new WSFWebRTCImpl({ role: "receiver", peerId: state.targetId, sharerId: state.shareId, selfId: state.userId })
             webrtc?.bindEvents();
