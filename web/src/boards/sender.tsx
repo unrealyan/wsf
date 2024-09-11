@@ -24,7 +24,6 @@ export default function Sender() {
         WSClient.on("SEND_FILE", sendFiles)
     })
 
-
     const getSelfId = (id:string) => {
        action.setUserId(id)
     }
@@ -41,18 +40,13 @@ export default function Sender() {
     }
 
     const handleWebRTCMessage = (e: any) => {
-    if (e.type === "progress") {
-        console.log(e)
-        
+     if (e.type === "progress") {        
         updateUser(e.data.peerId,{
             receiverSize: e.data.receiverSize,
             speed:e.data.speed,
             progress:e.data.progress,
             fileSize:e.data.fileSize
         })
-      // setStore("progress", e.data);
-    //   action.setProgress(e.data)
-    //   updateProgress(e.data, e.speed);
     } else if (e.type === "fileReceived") {
         console.log(e.data)
         updateUser(e.data.peerId,{
@@ -61,16 +55,9 @@ export default function Sender() {
             progress:e.data.progress,
             fileSize:e.data.fileSize
         })
-    //   setProgressDone();
+        action.setUpload({disable:false})
     } else if (e.type === "transferStart") {
-
-        updateUser(e.data.peerId,{
-            receiverSize: e.data.receiverSize,
-            speed:e.data.speed,
-            progress:e.data.progress,
-            fileSize:e.data.fileSize
-        })
-    //   resetProgress();
+        action.setUpload({disable:true})
     }
   };
 

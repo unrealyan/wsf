@@ -260,10 +260,10 @@ class WSFWebRTCImpl implements WSFWebRTC {
         this.isTransferring = true;
 
         // 通知传输开始
-        // this.dispatch({
-        //     type: "transferStart",
-        //     data: null
-        // });
+        this.dispatch({
+            type: "transferStart",
+            data: null
+        });
         
         let dataChannel = this.channel
         const chunkSize = 64 * 1024; // 64KB chunks
@@ -309,7 +309,7 @@ class WSFWebRTCImpl implements WSFWebRTC {
         };
 
         const sendChunk = (chunk: ArrayBuffer) => {
-            console.log('sendChunk',offset,chunk.byteLength)
+
             dataChannel.send(chunk);
             offset += chunk.byteLength;
             this.sendSize  += chunk.byteLength;
