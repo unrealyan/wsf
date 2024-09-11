@@ -46,7 +46,7 @@ const ProgressBar: (props: ProgressBarProps) => JSX.Element = (props) => {
         <>
             {status() && (
                 <div id="progress-container" class="bg-white p-4 rounded-lg shadow-md border border-gray-200">
-                    <div class="font-semibold text-lg text-gray-800">FileName: <span class="text-gray-600">{props.filename}</span></div>
+                    <div class="font-semibold text-lg text-gray-800 overflow-hidden text-ellipsis whitespace-nowrap">FileName: <span class="text-gray-600">{props.filename}</span></div>
                     <div class="flex items-center justify-between mb-2">
                         <span class="font-semibold text-lg text-gray-800">progress</span>
                         <span class="text-gray-600">{speed()}</span>

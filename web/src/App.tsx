@@ -76,7 +76,6 @@ const App: Component = () => {
       </div>
 
       <Show when={state.role === "sender"}>
-        <div class='m-2 text-white text-center'>Wait for user join</div>
         <Copy text={`${location.origin}/?s=${state.shareId}`} onCopy={() => console.log('Copied!')}>
           <p class="text-gray-400">{`${location.origin}/?s=${state.shareId}`}</p>
         </Copy>
