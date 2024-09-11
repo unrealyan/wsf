@@ -33,6 +33,10 @@ export interface Peer {
   webrtc?: WSFWebRTC | null
 }
 
+export interface Upload {
+  disable:boolean
+}
+
 
 export interface ISender extends User {
   // Additional properties specific to Receiver can be added here
@@ -60,6 +64,7 @@ export interface StateType {
   role: "sender" | "receiver";
   totalFiles: number;
   totalSize: number;
+  upload:Upload;
   sender: ISender;
   reciever: IReceiver;
 }
@@ -80,6 +85,7 @@ export interface ActionType {
   setRole: (role: "sender" | "receiver") => void;
   setTotalFiles: (total: number) => void;
   setTotalSize: (size: number) => void;
+  setUpload:(upload:Upload) => void;
   setReciver: (user: IReceiver) => void;
   updateState: (newState: Partial<StateType>) => void;
 }
@@ -109,6 +115,9 @@ export default function StoreProvider(props: any) {
     role: "sender", // 或 "receiver"
     totalFiles: 0,
     totalSize: 0,
+    upload:{
+      disable:false
+    },
     sender: {
       id: "",
       filename: '',
@@ -151,6 +160,7 @@ export default function StoreProvider(props: any) {
       setRole: (role: "sender" | "receiver") => setState('role', role),
       setTotalFiles: (total: number) => setState('totalFiles', total),
       setTotalSize: (size: number) => setState('totalSize', size),
+      setUpload:(upload:Upload) => setState('upload',upload),
       setReciver: (user: IReceiver) => setState('reciever', user),
       updateState: updateState,
     }

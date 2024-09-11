@@ -131,6 +131,11 @@ func broadcastStats() {
 }
 
 func handleWebSocket(w http.ResponseWriter, r *http.Request) {
+	forwardedFor := r.Header.Get("X-Forwarded-For")
+	if forwardedFor != "" {
+		r.RemoteAddr = forwardedFor
+	}
+	log.Println("Remote address:", r.RemoteAddr, forwardedFor)
 	shareId := r.URL.Query().Get("s")
 	if shareId == "" {
 		// http.Error(w, "Missing share ID", http.StatusBadRequest)
@@ -230,28 +235,31 @@ func handleMessage(shareId, userId string, msg []byte) {
 		}
 
 		if data["type"] == "request-status" {
-			if data["status"] == "accepted" {
-				if size, ok := data["size"].(float64); ok {
-					updateStats(int64(size))
+			// if data["status"] == "accepted" {
+			if size, ok := data["fileSize"].(float64); ok {
+				updateStats(int64(size))
 
-					// 记录上传信息
-					filename, _ := data["filename"].(string)
-					senderIP := getIP(connections[shareId][userId].RemoteAddr())
-					receiverIP := getIP(connections[shareId][target].RemoteAddr())
-					sendTime := time.Now()
+				// 记录上传信息
+				filename, _ := data["filename"].(string)
+				senderRemoteIp := connections[shareId][userId].RemoteAddr()
 
-					go recordUpload(UploadRecord{
-						SenderID:    userId,
-						SenderIP:    senderIP,
-						Filename:    filename,
-						Filesize:    int64(size),
-						SendTime:    sendTime,
-						ReceiverID:  target,
-						ReceiverIP:  receiverIP,
-						ReceiveTime: sendTime, // 暂时设置为相同时间，后续可以更新
-					})
-				}
+				receiverRemoteIp := connections[shareId][target].RemoteAddr()
+				senderIP := getIP(senderRemoteIp)
+				receiverIP := getIP(receiverRemoteIp)
+				sendTime := time.Now()
+
+				go recordUpload(UploadRecord{
+					SenderID:    userId,
+					SenderIP:    senderIP,
+					Filename:    filename,
+					Filesize:    int64(size),
+					SendTime:    sendTime,
+					ReceiverID:  target,
+					ReceiverIP:  receiverIP,
+					ReceiveTime: sendTime, // 暂时设置为相同时间，后续可以更新
+				})
 			}
+			// }
 		}
 		connMutex.Unlock()
 
