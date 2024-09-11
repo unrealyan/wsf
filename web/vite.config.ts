@@ -24,6 +24,12 @@ export default defineConfig({
     solidPlugin(),
   ],
   server: {
+    // origin:"wsf.io",
+    cors:true,
+    hmr:{
+      host:"wsf.io",
+    },
+    host:true,
     port: 3000,
   },
   build: {

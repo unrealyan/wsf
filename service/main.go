@@ -25,10 +25,15 @@ const (
 	WEBSOCKET_SERVER_PORT = 8895
 )
 
+type CustomConn struct {
+	*websocket.Conn
+	ClientIP string
+}
+
 var (
-	connections = make(map[string]map[string]*websocket.Conn) // shareId -> userId -> connection
-	senders     = make(map[string][]string)                   // shareId -> [userIds]
-	receivers   = make(map[string][]string)                   // shareId -> [userIds]
+	connections = make(map[string]map[string]CustomConn) // shareId -> userId -> connection
+	senders     = make(map[string][]string)              // shareId -> [userIds]
+	receivers   = make(map[string][]string)              // shareId -> [userIds]
 	connMutex   sync.Mutex
 	upgrader    = websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
@@ -153,9 +158,9 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	userId := assignUserId()
 	connMutex.Lock()
 	if connections[shareId] == nil {
-		connections[shareId] = make(map[string]*websocket.Conn)
+		connections[shareId] = make(map[string]CustomConn)
 	}
-	connections[shareId][userId] = conn
+	connections[shareId][userId] = CustomConn{conn, formatIP(r.RemoteAddr)}
 	connMutex.Unlock()
 
 	log.Printf("User: %s connected to share: %s", userId, shareId)
@@ -241,11 +246,13 @@ func handleMessage(shareId, userId string, msg []byte) {
 
 				// 记录上传信息
 				filename, _ := data["filename"].(string)
-				senderRemoteIp := connections[shareId][userId].RemoteAddr()
+				senderRemoteIp := connections[shareId][userId].ClientIP
 
-				receiverRemoteIp := connections[shareId][target].RemoteAddr()
-				senderIP := getIP(senderRemoteIp)
-				receiverIP := getIP(receiverRemoteIp)
+				receiverRemoteIp := connections[shareId][target].ClientIP
+				// senderIP := getIP(senderRemoteIp)
+				senderIP := senderRemoteIp
+				// receiverIP := getIP(receiverRemoteIp)
+				receiverIP := receiverRemoteIp
 				sendTime := time.Now()
 
 				go recordUpload(UploadRecord{
@@ -332,4 +339,14 @@ func getIP(addr net.Addr) string {
 		return tcpAddr.IP.String()
 	}
 	return ""
+}
+
+func formatIP(remoteAddr string) string {
+	ip, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil {
+		// 处理错误，例如日志记录
+		log.Printf("Error splitting host and port: %v", err)
+		ip = remoteAddr // 如果发生错误，使用完整的地址
+	}
+	return ip
 }
