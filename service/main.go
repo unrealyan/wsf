@@ -259,7 +259,7 @@ func handleMessage(shareId, userId string, msg []byte) {
 			conn.WriteJSON(data)
 		}
 
-		if data["type"] == "request-status" {
+		if data["type"] == "offer" {
 			// if data["status"] == "accepted" {
 			if size, ok := data["fileSize"].(float64); ok {
 				updateStats(int64(size))

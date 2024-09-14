@@ -199,6 +199,7 @@ class WSFWebRTCImpl implements WSFWebRTC {
             userId: this.selfId,
             sdp: offer,
             filename: this.file?.name,
+            fileSize: this.file?.size
         })
 
         await this.webrtcPeer.setLocalDescription(offer)
