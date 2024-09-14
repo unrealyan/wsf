@@ -14,11 +14,9 @@ export default function Sender() {
 
     onMount(() => {
         WSClient.onmessage()
-        WSClient.on("ALL_RECEIVERS", getAllReceivers)
+
         WSClient.on("SET_SHARE_ID", getShareId)
         WSClient.on("SET_USER_ID", getSelfId)
-        WSClient.on("SEND_FILE", sendFiles)
-        WSClient.on("READY_TO_SEND_FILE", sendUserToReceiver)
         WSClient.on("CREATE_RECEIVER", createReceiver)
         WSClient.on("RECEIVER_OFFLINE", onReceiverOffline)
     })
@@ -26,9 +24,6 @@ export default function Sender() {
     const getSelfId = (id: string) => {
         action.setUserId(id)
     }
-
-
-
 
     const updateUser = (id: string, { receiverSize, progress, speed, fileSize }: any) => {
         let userList = state.receivers.map(item => Object.assign({}, item))
@@ -50,7 +45,6 @@ export default function Sender() {
                 fileSize: e.data.fileSize
             })
         } else if (e.type === "fileReceived") {
-            console.log(e.data)
             updateUser(e.data.peerId, {
                 receiverSize: e.data.receiverSize,
                 speed: e.data.speed,
@@ -63,25 +57,7 @@ export default function Sender() {
         }
     };
 
-    const getAllReceivers = (userIds: string[]) => {
-        action.setUserList(userIds.map(user => {
-            let webrtc = new WSFWebRTCImpl({ role: "sender", peerId: user, sharerId: state.shareId, selfId: state.userId })
-            webrtc.bindEvents()
-            webrtc.onmessage = handleWebRTCMessage
 
-            return {
-                id: user,
-                filename: state.file?.name || "",
-                fileSize: state.file?.size || 0,
-                handleFileSize: 0,
-                receiverSize: 0,
-                progress: 0,
-                speed: 0,
-                start: false,
-                webrtc
-            }
-        }))
-    }
 
     const createReceiver = (data: any) => {
         if (!state.file) return
@@ -110,25 +86,8 @@ export default function Sender() {
     }
 
     const handleFileUpload = (uploadedFiles: File[]) => {
-        console.log(files)
         setFiles(uploadedFiles);
     };
-
-    const sendUserToReceiver = (data: any) => {
-        console.log(data)
-        if (!state.file) return
-        data.userIds.forEach((userId: string) => {
-            let data = JSON.stringify({
-                type: "notice",
-                userId: state.userId,
-                shareId: state.shareId,
-                target: userId,
-                filename: state.file?.name,
-                fileSize: state.file?.size
-            })
-            WSClient.ws.send(data)
-        })
-    }
 
     const onReceiverOffline = (id: string) => {
         let receivers = state.receivers.filter(user => user.id != id)

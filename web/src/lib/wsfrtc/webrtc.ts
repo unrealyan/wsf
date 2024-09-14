@@ -151,15 +151,8 @@ class WSFWebRTCImpl implements WSFWebRTC {
     }
 
     bindEvents(): void {
-        // console.log("bindevents")
-        // this.webrtcPeer.oniceconnectionstatechange = event => {
-        //     console.log("ICE connection state changed:", event);
-        // }
-
-        // WSclient.on("SEND_OFFER", this.sendOffer)
         WSclient.on("ACCEPT_OFFER_AND_SEND_ANSWER", this.acceptOfferAndSendAnswer)
         WSclient.on("ACCEPT_ANSWER", this.acceptAnswer)
-        // WSclient.on("ACCEPT_ANSWER_AND_SEND_CANDIDATE", this.sendCandidate)
         WSclient.on("ACCEPT_CANDIDATE_AND_EXCHANGE", this.acceptCandidate)
     }
 
@@ -312,7 +305,6 @@ class WSFWebRTCImpl implements WSFWebRTC {
         };
 
         const sendChunk = (chunk: ArrayBuffer) => {
-
             dataChannel.send(chunk);
             offset += chunk.byteLength;
             this.sendSize += chunk.byteLength;

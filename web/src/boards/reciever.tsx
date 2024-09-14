@@ -2,7 +2,6 @@ import { createSignal, onMount } from "solid-js"
 import { StoreType, useStore } from "../lib/store";
 import WSFWebRTCImpl from "../lib/wsfrtc/webrtc";
 import WSClient from "../lib/wsfws/webSocket";
-import { userInteractionForSelectionManager } from "../lib/userInteractionManager";
 import ProgressBar from "../components/progress/progress";
 import Offline from "../components/offline/offline";
 
@@ -18,8 +17,6 @@ export default function Receiver(props: any) {
         WSClient.on("SET_SHARE_ID", getShareId)
         WSClient.on("SET_TARGETID", setTargetId)
         WSClient.on("INIT_RECEIVER", onInitReceiver)
-
-        WSClient.on("REQUEST_FILE", requestFile)
         WSClient.on("SET_OFFLINE", setOffline)
         WSClient.on("SET_ONLINE", setOnline)
 
@@ -47,28 +44,13 @@ export default function Receiver(props: any) {
 
 
     const onInitReceiver = (data: any) => {
-        console.log(data)
         Promise.all([action.setUserId(data.userId), action.setTargetId(data.target), action.setShareId(data.shareId)]).then(() => {
             let webrtc = new WSFWebRTCImpl({ role: "receiver", peerId: state.targetId, sharerId: state.shareId, selfId: state.userId })
             webrtc?.bindEvents();
             webrtc.onmessage = handleWebRTCMessage
             setWebRTCReceiver(webrtc)
-
         })
-
     }
-
-    const requestFile = (d: any) => {
-        let data = JSON.stringify({
-            type: "request-file",
-            userId: d.userId,
-            shareId: d.shareId,
-            target: d.sender
-        })
-        WSClient.ws.send(data)
-    }
-
-
 
 
     const updateUser = ({ filename, receiverSize, progress, speed, fileSize }: any) => {
@@ -86,11 +68,9 @@ export default function Receiver(props: any) {
 
     const handleWebRTCMessage = (e: any) => {
         if (e.type === "progress") {
-
             receiverProgressRef.setValue(e.data.progress);
             receiverProgressRef.setSpeed(e.data.speed);
             updateUser(e.data)
-
         } else if (e.type === "fileReceived") {
 
             receiverProgressRef.setDone(true)
@@ -102,7 +82,10 @@ export default function Receiver(props: any) {
         }
     };
 
-    console.log(state)
+    const onErrorRTC = () =>{
+        // close webrtc
+    }
+
 
     return <div class="col-span-full w-[90%] bg-white p-10 mt-8 mr-auto ml-auto rounded">
         <label for="cover-photo" class="flex font-medium leading-6 text-gray-900 text-2xl m-10 justify-center">WebRTC File Sharing</label>
@@ -116,6 +99,5 @@ export default function Receiver(props: any) {
                 </div>}</>
         }
         {props.children}
-        {/* <AcceptBanner ref={el => acceptRef = el} onAccept={onAccept} onDecline={onDecline} user={state.targetId} /> */}
     </div>
 }
