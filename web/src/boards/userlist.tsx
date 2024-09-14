@@ -1,8 +1,6 @@
 import { createEffect, createSignal, For } from "solid-js";
 import UserItem from "../components/userItem";
-import WebRTCImpl from '../lib/webrtc';
 import { createStore } from "solid-js/store";
-import WebSocketClient, { StoreType } from "../lib/webSocket";
 import { Peer, useStore } from "../lib/store";
 import {WSFWebRTC} from "../lib/wsfrtc/webrtc";
 
@@ -23,6 +21,7 @@ interface UserListStore {
     userList: Peer[]
 }
 export default function UserListContainer(props: UserListContainerProps) {
+    console.log(props.userList)
     const [state, action] = useStore()
 
     const [store, setStore] = createStore<UserListStore>({ userList: [] })

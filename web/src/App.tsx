@@ -1,21 +1,17 @@
 import { createEffect, createSignal, onMount, Show, type Component, batch } from 'solid-js';
 import { createStore } from "solid-js/store";
 import Upload from './components/upload';
-import WebRTC from './lib/webrtc';
 import LargeFileReceiver from './lib/largeFileReceiver';
 import AcceptBanner from './components/acceptBanner';
 import Header from './components/header';
 import ProgressBar from "./components/progress/progress";
 import Receiver from './boards/reciever';
 import Copy from './components/copy';
-import WebSocketClient from './lib/webSocket';
 import StatisticsManager from './components/statisticsManager';
 import UserListContainer, { User } from './boards/userlist';
 import Desc from './components/desc';
 import { useStore, StateType, StoreType, IReceiver, StoreManager } from './lib/store';
-import WebRTCImpl from './lib/webrtc';
 import Sender from './boards/sender'
-import { WebRTCReceiver } from './lib/mywebrtc';
 
 import WSClient from "./lib/wsfws/webSocket";
 
@@ -67,19 +63,15 @@ const App: Component = () => {
 
           </div>
         </div>
-        <Show when={state.userList.length > 0}>
+        <Show when={state.receivers.length > 0}>
           <div class={`sider w-[30%] overflow`}>
-            <UserListContainer userList={state.userList} />
+            <UserListContainer userList={state.receivers} />
           </div>
         </Show>
 
       </div>
 
-      <Show when={state.role === "sender"}>
-        <Copy text={`${location.origin}/?s=${state.shareId}`} onCopy={() => console.log('Copied!')}>
-          <p class="text-gray-400">{`${location.origin}/?s=${state.shareId}`}</p>
-        </Copy>
-      </Show>
+      
 
 
       {state.role === "receiver" && (

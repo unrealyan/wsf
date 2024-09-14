@@ -6,7 +6,7 @@ export interface WSFWebRTC {
     webrtcPeer: RTCPeerConnection
     peerId: string
     sharerId: string
-    file:File | null
+    file: File | null
     fileReceiver: LargeFileReceiver
     sendSize: number
     // peerConnection(): RTCPeerConnection
@@ -17,10 +17,10 @@ export interface WSFWebRTC {
     acceptAnswer(answer: RTCSessionDescription): void
     sendCandidate(candidate: RTCIceCandidate): void
     acceptCandidate(candidate: RTCIceCandidate): void
-    setFile(file:File|null): void
+    setFile(file: File | null): void
     sendFile(): void
     bindEvents(): void
-    setReceiverFile(filename:string):void
+    setReceiverFile(filename: string): void
 
 }
 
@@ -47,14 +47,14 @@ const configuration: RTCConfiguration = {
         }
     ]
 }
-type WSFWebRTCType = { role:string,peerId: string, sharerId: string, selfId: string }
+type WSFWebRTCType = { role: string, peerId: string, sharerId: string, selfId: string }
 
 class WSFWebRTCImpl implements WSFWebRTC {
     webrtcPeer!: RTCPeerConnection
     peerId!: string;
     selfId!: string;
     sharerId!: string;
-    role:string;
+    role: string;
     sendSize: number = 0
     private receivedSize: number = 0
     private startTime: number = 0
@@ -62,16 +62,17 @@ class WSFWebRTCImpl implements WSFWebRTC {
     private lastReceivedSize: number = 0
     private isTransferring: boolean = false;
     private isReceiving: boolean = false;
+    private isReadyToSendIceCandidates: boolean = false;
     fileReceiver!: LargeFileReceiver;
-    channel!:RTCDataChannel
+    channel!: RTCDataChannel
     private messageHandler: ((e: MessageEvent) => void) | null = null;
     private fileWriter: FileSystemWritableFileStream | null = null
     file!: File | null;
     private _onmessage: (event: any) => void;
 
-    constructor({ role,peerId, sharerId, selfId }: WSFWebRTCType) {
+    constructor({ role, peerId, sharerId, selfId }: WSFWebRTCType) {
 
-        this.role =role
+        this.role = role
         this.peerId = peerId
         this.selfId = selfId
         this.sharerId = sharerId
@@ -81,59 +82,59 @@ class WSFWebRTCImpl implements WSFWebRTC {
         if (role === "sender") {
             this.channel?.addEventListener("open", this.onDataChannelOpen)
         } else if (role === "receiver") {
-            this.webrtcPeer.addEventListener("datachannel", (e:any)=>this.onRecieveChannelOpen(e))
+            this.webrtcPeer.addEventListener("datachannel", (e: any) => this.onRecieveChannelOpen(e))
         }
 
         this.webrtcPeer.addEventListener("datachannel", (e) => {
             console.log(e)
         })
-        
+
 
         // Add onicecandidate event listener here
         this.webrtcPeer.onicecandidate = (event) => {
             console.log("onicecandidate event triggered", event);
-            if (event.candidate) {
+            if (event.candidate && this.isReadyToSendIceCandidates) {
                 console.log("ICE candidate:", event.candidate);
                 this.onIceCandidate(event.candidate);
             } else {
                 console.log("ICE candidate gathering completed");
             }
         };
-    
+
         this.webrtcPeer.onicegatheringstatechange = (event) => {
             console.log("ICE gathering state changed:", this.webrtcPeer.iceGatheringState);
         };
-    
+
         this.webrtcPeer.onconnectionstatechange = (event) => {
             console.log("Connection state changed:", this.webrtcPeer.connectionState);
         };
         this.webrtcPeer.addEventListener(
             "connectionstatechange",
             (event) => {
-              switch (this.webrtcPeer.connectionState) {
-                case "new":
-                case "connecting":
-                  console.log("Connecting…");
-                  break;
-                case "connected":
-                    console.log("Online");
-                  break;
-                case "disconnected":
-                    console.log("Disconnecting…");
-                  break;
-                case "closed":
-                    console.log("Offline");
-                  break;
-                case "failed":
-                    console.log("Error");
-                  break;
-                default:
-                    console.log("Unknown");
-                  break;
-              }
+                switch (this.webrtcPeer.connectionState) {
+                    case "new":
+                    case "connecting":
+                        console.log("Connecting…");
+                        break;
+                    case "connected":
+                        console.log("Online");
+                        break;
+                    case "disconnected":
+                        console.log("Disconnecting…");
+                        break;
+                    case "closed":
+                        console.log("Offline");
+                        break;
+                    case "failed":
+                        console.log("Error");
+                        break;
+                    default:
+                        console.log("Unknown");
+                        break;
+                }
             },
             false,
-          );
+        );
         this.acceptOffer = this.acceptOffer.bind(this)
         this.acceptAnswer = this.acceptAnswer.bind(this)
         this.sendOffer = this.sendOffer.bind(this)
@@ -146,14 +147,14 @@ class WSFWebRTCImpl implements WSFWebRTC {
         this.onRecieveChannelOpen = this.onRecieveChannelOpen.bind(this)
         this.setFile = this.setFile.bind(this)
         this.acceptOfferAndSendAnswer = this.acceptOfferAndSendAnswer.bind(this)
-        
+
     }
 
     bindEvents(): void {
-
-        this.webrtcPeer.oniceconnectionstatechange = event => {
-            console.log("ICE connection state changed:", event);
-        }
+        // console.log("bindevents")
+        // this.webrtcPeer.oniceconnectionstatechange = event => {
+        //     console.log("ICE connection state changed:", event);
+        // }
 
         // WSclient.on("SEND_OFFER", this.sendOffer)
         WSclient.on("ACCEPT_OFFER_AND_SEND_ANSWER", this.acceptOfferAndSendAnswer)
@@ -167,7 +168,7 @@ class WSFWebRTCImpl implements WSFWebRTC {
     }
 
     setFile(file: File): void {
-        if (file){
+        if (file) {
             this.file = file;
         }
     }
@@ -181,15 +182,15 @@ class WSFWebRTCImpl implements WSFWebRTC {
         await this.acceptOffer(offer).then(this.sendAnswer)
     }
     async sendOffer(): Promise<void> {
-      
+
         this.channel = this.webrtcPeer.createDataChannel(JSON.stringify({
-            name:this.file?.name,
-            size:this.file?.size
-        }),{
-            ordered:true
+            name: this.file?.name,
+            size: this.file?.size
+        }), {
+            ordered: true
         })
         this.channel.addEventListener("open", this.onDataChannelOpen, { once: true });
-        this.channel.addEventListener("message", (e)=>{
+        this.channel.addEventListener("message", (e) => {
             console.log(e)
         })
         this.channel.addEventListener("close", () => {
@@ -205,7 +206,7 @@ class WSFWebRTCImpl implements WSFWebRTC {
             target: this.peerId,
             userId: this.selfId,
             sdp: offer,
-            filename:this.file?.name,
+            filename: this.file?.name,
         })
 
         await this.webrtcPeer.setLocalDescription(offer)
@@ -229,14 +230,15 @@ class WSFWebRTCImpl implements WSFWebRTC {
             sdp: answer
         })
         WSclient.sendAnswer(data)
+        this.isReadyToSendIceCandidates = true
     }
     async acceptAnswer(answer: RTCSessionDescription): Promise<void> {
         await this.webrtcPeer.setRemoteDescription(answer)
-
+        this.isReadyToSendIceCandidates = true
         // let dataChannel.binaryType = "arraybuffer";;
         // this.sendAnswer()
     }
-    async sendCandidate(candidate:RTCIceCandidate): Promise<void> {
+    async sendCandidate(candidate: RTCIceCandidate): Promise<void> {
         let data = JSON.stringify({
             type: "new-ice-candidate",
             shareId: this.sharerId,
@@ -247,12 +249,13 @@ class WSFWebRTCImpl implements WSFWebRTC {
         WSclient.sendCandidate(data)
     }
     async acceptCandidate(candidate: RTCIceCandidate): Promise<void> {
+        console.log("accept candidate")
         await this.webrtcPeer.addIceCandidate(candidate)
     }
 
-    async onDataChannelOpen () {
+    async onDataChannelOpen() {
         // let file = new File(["hello"], "hello.txt", { type: "text/plain" });
-        let file = this.file ||  new File(["hello"], "hello2.txt", { type: "text/plain" }); 
+        let file = this.file || new File(["hello"], "hello2.txt", { type: "text/plain" });
         if (this.isTransferring) {
             console.warn('Transfer already in progress');
             return;
@@ -264,7 +267,7 @@ class WSFWebRTCImpl implements WSFWebRTC {
             type: "transferStart",
             data: null
         });
-        
+
         let dataChannel = this.channel
         const chunkSize = 64 * 1024; // 64KB chunks
         let offset = 0;
@@ -281,12 +284,12 @@ class WSFWebRTCImpl implements WSFWebRTC {
                 // this message for sender
                 this.dispatch({
                     type: "fileReceived",
-                    data: { 
-                        progress:100,
+                    data: {
+                        progress: 100,
                         receiverSize: this.sendSize,
                         fileSize: file.size,
-                        user:"sender",
-                        peerId:this.peerId
+                        user: "sender",
+                        peerId: this.peerId
                     }
                 });
                 return;
@@ -312,38 +315,38 @@ class WSFWebRTCImpl implements WSFWebRTC {
 
             dataChannel.send(chunk);
             offset += chunk.byteLength;
-            this.sendSize  += chunk.byteLength;
+            this.sendSize += chunk.byteLength;
 
-            const progress = Math.ceil(this.sendSize  / (file.size / 100));
+            const progress = Math.ceil(this.sendSize / (file.size / 100));
             const currentTime = Date.now();
             const elapsedTime = (currentTime - lastUpdateTime) / 1000; // 转换为秒
-            
+
             if (elapsedTime >= 1) { // 每秒更新一次速度
-                const speed = (this.sendSize  - lastReceivedSize) / elapsedTime;
+                const speed = (this.sendSize - lastReceivedSize) / elapsedTime;
                 this.dispatch({
                     type: "progress",
                     data: {
                         progress,
                         receiverSize: this.sendSize,
                         fileSize: file.size,
-                        user:"sender",
-                        peerId:this.peerId,
-                        speed: formatBytes(speed)+"/s"
+                        user: "sender",
+                        peerId: this.peerId,
+                        speed: formatBytes(speed) + "/s"
                     }
                 });
                 lastUpdateTime = currentTime;
-                lastReceivedSize = this.sendSize ;
+                lastReceivedSize = this.sendSize;
             } else {
-                const speed = (this.sendSize  - lastReceivedSize) / elapsedTime;
+                const speed = (this.sendSize - lastReceivedSize) / elapsedTime;
                 this.dispatch({
                     type: "progress",
                     data: {
                         progress,
                         receiverSize: this.sendSize,
                         fileSize: file.size,
-                        user:"sender",
-                        peerId:this.peerId,
-                        speed: formatBytes(speed)+"/s"
+                        user: "sender",
+                        peerId: this.peerId,
+                        speed: formatBytes(speed) + "/s"
                     }
                 });
             }
@@ -355,135 +358,135 @@ class WSFWebRTCImpl implements WSFWebRTC {
 
         this.channel.send('start');
         sendNextChunk();
-      
-        
+
+
     };
 
-    async onRecieveChannelOpen(e:RTCDataChannelEvent): Promise<void> {
+    async onRecieveChannelOpen(e: RTCDataChannelEvent): Promise<void> {
         console.log(e)
         let recieveChannel = e.channel;
 
-            recieveChannel.addEventListener("error", (err) => {
-                console.log("Error:", err);
-            });
+        recieveChannel.addEventListener("error", (err) => {
+            console.log("Error:", err);
+        });
 
-            let fileInfo: { name: string, size: number };
+        let fileInfo: { name: string, size: number };
 
-            const handleMessage = async (e: MessageEvent) => {
-                const { data } = e;
-                const { fileReceiver } = this
+        const handleMessage = async (e: MessageEvent) => {
+            const { data } = e;
+            const { fileReceiver } = this
 
-                if (data === 'start') {
-                    if (this.isReceiving) {
-                        console.warn('Already receiving a file');
-                        return;
-                    }
-                    this.isReceiving = true;
-                    console.log("receiver start");
-                    fileInfo = JSON.parse(recieveChannel.label);
-                    this.receivedSize = 0;
-                    this.startTime = Date.now();
-                    this.lastUpdateTime = this.startTime;
-                    this.lastReceivedSize = 0;
-                    this.dispatch({
-                        type: "transferStart",
-                        data: {
-                            progress:0,
-                            receiverSize: this.sendSize,
-                            filename: fileInfo.name,
-                            fileSize: fileInfo.size,
-                            user:"sender",
-                            peerId:this.peerId,
-                            speed: formatBytes(0)+"/s"
-                        }
-                    });
-                } else if (data === 'done') {
-                    if (this.messageHandler) {
-                        recieveChannel.removeEventListener("message", this.messageHandler);
-                        this.messageHandler = null;
-                    }
-                    recieveChannel.close();
-                    fileReceiver.fileInfo = fileInfo;
-                    this.fileWriter = null;
-                    console.log('File received, size:', this.receivedSize);
-                    await fileReceiver.finish();
-                    // this.dispatch({
-                    //     type: "fileReceived",
-                    //     data: { name: fileInfo.name, size: this.receivedSize }
-                    // });
-                    this.dispatch({
-                        type: "fileReceived",
-                        data: {
-                            progress:100,
-                            receiverSize: this.sendSize,
-                            filename: fileInfo.name,
-                            fileSize: fileInfo.size,
-                            user:"sender",
-                            peerId:this.peerId,
-                            speed: formatBytes(0)+"/s"
-                        }
-                    });
-                    this.isReceiving = false;
-                } else {
-                    await fileReceiver.receiveChunk(data);
-                    this.receivedSize += data.byteLength;
-                    const progress = Math.ceil(this.receivedSize / (fileInfo.size / 100));
-
-                    const currentTime = Date.now();
-                    const elapsedTime = (currentTime - this.lastUpdateTime) / 1000; // 转换为秒
-                    
-                    if (elapsedTime >= 1) { // 每秒更新一次速度
-                        const speed = (this.receivedSize - this.lastReceivedSize) / elapsedTime;
-                        console.log(speed)
-                        this.dispatch({
-                            type: "progress",
-                            data: {
-                                progress,
-                                receiverSize: this.sendSize,
-                                filename: fileInfo.name,
-                                fileSize: fileInfo.size,
-                                user:"sender",
-                                peerId:this.peerId,
-                                speed: formatBytes(speed)+"/s"
-                            }
-                        });
-                        this.lastUpdateTime = currentTime;
-                        this.lastReceivedSize = this.receivedSize;
-                    } else {
-                        const speed = (this.receivedSize - this.lastReceivedSize) / elapsedTime;
-                        this.dispatch({
-                            type: "progress",
-                            data: {
-                                progress,
-                                receiverSize: this.sendSize,
-                                filename: fileInfo.name,
-                                fileSize: fileInfo.size,
-                                user:"sender",
-                                peerId:this.peerId,
-                                speed: formatBytes(speed)+"/s"
-                            }
-                        });
-                    }
+            if (data === 'start') {
+                if (this.isReceiving) {
+                    console.warn('Already receiving a file');
+                    return;
                 }
-            };
-
-            // 移除旧的事件监听器（如果存在）
-            if (this.messageHandler) {
-                recieveChannel.removeEventListener("message", this.messageHandler);
-            }
-
-            // 添加新的事件监听器
-            this.messageHandler = handleMessage;
-            recieveChannel.addEventListener("message", this.messageHandler);
-
-            // 当数据通道关闭时，清理事件监听器
-            recieveChannel.addEventListener("close", () => {
+                this.isReceiving = true;
+                console.log("receiver start");
+                fileInfo = JSON.parse(recieveChannel.label);
+                this.receivedSize = 0;
+                this.startTime = Date.now();
+                this.lastUpdateTime = this.startTime;
+                this.lastReceivedSize = 0;
+                this.dispatch({
+                    type: "transferStart",
+                    data: {
+                        progress: 0,
+                        receiverSize: this.sendSize,
+                        filename: fileInfo.name,
+                        fileSize: fileInfo.size,
+                        user: "sender",
+                        peerId: this.peerId,
+                        speed: formatBytes(0) + "/s"
+                    }
+                });
+            } else if (data === 'done') {
                 if (this.messageHandler) {
                     recieveChannel.removeEventListener("message", this.messageHandler);
                     this.messageHandler = null;
                 }
+                recieveChannel.close();
+                fileReceiver.fileInfo = fileInfo;
+                this.fileWriter = null;
+                console.log('File received, size:', this.receivedSize);
+                await fileReceiver.finish();
+                // this.dispatch({
+                //     type: "fileReceived",
+                //     data: { name: fileInfo.name, size: this.receivedSize }
+                // });
+                this.dispatch({
+                    type: "fileReceived",
+                    data: {
+                        progress: 100,
+                        receiverSize: this.sendSize,
+                        filename: fileInfo.name,
+                        fileSize: fileInfo.size,
+                        user: "sender",
+                        peerId: this.peerId,
+                        speed: formatBytes(0) + "/s"
+                    }
+                });
                 this.isReceiving = false;
-            });
+            } else {
+                await fileReceiver.receiveChunk(data);
+                this.receivedSize += data.byteLength;
+                const progress = Math.ceil(this.receivedSize / (fileInfo.size / 100));
+
+                const currentTime = Date.now();
+                const elapsedTime = (currentTime - this.lastUpdateTime) / 1000; // 转换为秒
+
+                if (elapsedTime >= 1) { // 每秒更新一次速度
+                    const speed = (this.receivedSize - this.lastReceivedSize) / elapsedTime;
+                    console.log(speed)
+                    this.dispatch({
+                        type: "progress",
+                        data: {
+                            progress,
+                            receiverSize: this.sendSize,
+                            filename: fileInfo.name,
+                            fileSize: fileInfo.size,
+                            user: "sender",
+                            peerId: this.peerId,
+                            speed: formatBytes(speed) + "/s"
+                        }
+                    });
+                    this.lastUpdateTime = currentTime;
+                    this.lastReceivedSize = this.receivedSize;
+                } else {
+                    const speed = (this.receivedSize - this.lastReceivedSize) / elapsedTime;
+                    this.dispatch({
+                        type: "progress",
+                        data: {
+                            progress,
+                            receiverSize: this.sendSize,
+                            filename: fileInfo.name,
+                            fileSize: fileInfo.size,
+                            user: "sender",
+                            peerId: this.peerId,
+                            speed: formatBytes(speed) + "/s"
+                        }
+                    });
+                }
+            }
+        };
+
+        // 移除旧的事件监听器（如果存在）
+        if (this.messageHandler) {
+            recieveChannel.removeEventListener("message", this.messageHandler);
+        }
+
+        // 添加新的事件监听器
+        this.messageHandler = handleMessage;
+        recieveChannel.addEventListener("message", this.messageHandler);
+
+        // 当数据通道关闭时，清理事件监听器
+        recieveChannel.addEventListener("close", () => {
+            if (this.messageHandler) {
+                recieveChannel.removeEventListener("message", this.messageHandler);
+                this.messageHandler = null;
+            }
+            this.isReceiving = false;
+        });
     }
     get onmessage() {
         return this._onmessage;
