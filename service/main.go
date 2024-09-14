@@ -28,6 +28,7 @@ const (
 type CustomConn struct {
 	*websocket.Conn
 	ClientIP string
+	Role     string
 }
 
 var (
@@ -142,6 +143,7 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Println("Remote address:", r.RemoteAddr, forwardedFor)
 	shareId := r.URL.Query().Get("s")
+	role := r.URL.Query().Get("r")
 	if shareId == "" {
 		// http.Error(w, "Missing share ID", http.StatusBadRequest)
 		// return
@@ -156,20 +158,49 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	defer conn.Close()
 
 	userId := assignUserId()
+	if role == "sender" {
+		if sender := getSender(shareId); sender != "" {
+			userId = sender
+		}
+	}
 	connMutex.Lock()
-	if connections[shareId] == nil {
+	if _, ok := connections[shareId]; !ok {
 		connections[shareId] = make(map[string]CustomConn)
 	}
-	connections[shareId][userId] = CustomConn{conn, formatIP(r.RemoteAddr)}
+	connections[shareId][userId] = CustomConn{conn, formatIP(r.RemoteAddr), role}
 	connMutex.Unlock()
 
 	log.Printf("User: %s connected to share: %s", userId, shareId)
 
-	conn.WriteJSON(map[string]interface{}{
-		"type":    "user-id",
-		"userId":  userId,
-		"shareId": shareId,
-	})
+	if role == "sender" {
+		conn.WriteJSON(map[string]interface{}{
+			"type":    "user-id",
+			"userId":  userId,
+			"shareId": shareId,
+		})
+		sendReceivers(shareId, map[string]interface{}{
+			"type":    "sender-online",
+			"shareId": shareId,
+			"userId":  userId,
+		})
+	} else {
+		if sender := getSender(shareId); sender != "" {
+			conn.WriteJSON(map[string]interface{}{
+				"type":    "user-id",
+				"userId":  userId,
+				"shareId": shareId,
+				"target":  sender,
+			})
+		} else {
+			conn.WriteJSON(map[string]interface{}{
+				"type":    "error",
+				"userId":  userId,
+				"shareId": shareId,
+				"message": "sender offline",
+			})
+		}
+
+	}
 
 	// 发送初始统计数据
 	statsMutex.Lock()
@@ -185,6 +216,7 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Printf("User: %s disconnected from share: %s", userId, shareId)
 			connMutex.Lock()
+
 			delete(connections[shareId], userId)
 			if len(connections[shareId]) == 0 {
 				delete(connections, shareId)
@@ -192,7 +224,12 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 			senders[shareId] = removeElement(senders[shareId], userId)
 			receivers[shareId] = removeElement(receivers[shareId], userId)
 			connMutex.Unlock()
-			sendReceiversList(shareId)
+			sendSenderWithReceiverOffline(shareId, userId)
+			sendReceivers(shareId, map[string]interface{}{
+				"type":    "error",
+				"message": "sender-offline",
+			})
+			// sendReceiversList(shareId)
 			break
 		}
 		handleMessage(shareId, userId, msg)
@@ -208,38 +245,21 @@ func handleMessage(shareId, userId string, msg []byte) {
 	}
 
 	switch data["type"] {
-	case "sender":
-		connMutex.Lock()
-		senders[shareId] = append(senders[shareId], userId)
-		connMutex.Unlock()
-		sendReceiversList(shareId)
 
-	case "receiver":
-		connMutex.Lock()
-		receivers[shareId] = append(receivers[shareId], userId)
-		connMutex.Unlock()
-		sendReceiversList(shareId)
+	case "receivers-notice":
+		sendReceivers(shareId, map[string]interface{}{
+			"type":   "file-ready",
+			"target": userId,
+		})
 
-	case "initiate":
-		target := data["target"].(string)
-		connMutex.Lock()
-		if conn, ok := connections[shareId][userId]; ok {
-			conn.WriteJSON(map[string]interface{}{
-				"type":   "join",
-				"userId": userId,
-				"target": target,
-			})
-		}
-		connMutex.Unlock()
-
-	case "notice", "offer", "answer", "new-ice-candidate", "accept-request", "request-status":
+	case "offer", "answer", "new-ice-candidate", "request-file", "accept-request", "request-status":
 		target := data["target"].(string)
 		connMutex.Lock()
 		if conn, ok := connections[shareId][target]; ok {
 			conn.WriteJSON(data)
 		}
 
-		if data["type"] == "request-status" {
+		if data["type"] == "offer" {
 			// if data["status"] == "accepted" {
 			if size, ok := data["fileSize"].(float64); ok {
 				updateStats(int64(size))
@@ -273,16 +293,76 @@ func handleMessage(shareId, userId string, msg []byte) {
 	}
 }
 
+func getReceivers(shareId string) []string {
+	receivers := []string{}
+	for u, v := range connections[shareId] {
+		if v.Role != "sender" {
+			receivers = append(receivers, u)
+		}
+	}
+	return receivers
+}
+
+func getSender(shareId string) (sender string) {
+	for k, v := range connections[shareId] {
+		if v.Role == "sender" {
+			sender = k
+			break
+		}
+	}
+	return sender
+}
+
+func sendReceivers(shareId string, message map[string]interface{}) {
+	connMutex.Lock()
+	defer connMutex.Unlock()
+	for id, v := range connections[shareId] {
+		if v.Role == "receiver" {
+			message["userId"] = id
+			v.Conn.WriteJSON(message)
+		}
+	}
+}
+
+func sendSenderWithReceiverOffline(shareId string, userId string) {
+	connMutex.Lock()
+	defer connMutex.Unlock()
+
+	for id, v := range connections[shareId] {
+		if v.Role == "sender" && id != userId {
+			v.Conn.WriteJSON(map[string]interface{}{
+				"type":     "receiver-offline",
+				"receiver": userId,
+				"user":     id,
+			})
+			break
+		}
+
+	}
+
+}
+
 func sendReceiversList(shareId string) {
 	connMutex.Lock()
 	defer connMutex.Unlock()
-	for _, id := range senders[shareId] {
-		if conn, ok := connections[shareId][id]; ok {
+	for k := range connections[shareId] {
+		if conn, ok := connections[shareId][k]; ok {
 			conn.WriteJSON(map[string]interface{}{
 				"type":    "all-receivers",
-				"userIds": receivers[shareId],
-				"user":    id,
+				"userIds": getReceivers(shareId),
+				"user":    k,
 			})
+		}
+
+		// notice all receivers
+		for id := range connections[shareId] {
+			if conn, ok := connections[shareId][id]; ok {
+				conn.WriteJSON(map[string]interface{}{
+					"type":   "sender-online",
+					"user":   id,
+					"sender": getSender(shareId),
+				})
+			}
 		}
 	}
 }
@@ -303,6 +383,7 @@ func removeElement(slice []string, element string) []string {
 func initDB() {
 	var err error
 	db, err = sql.Open("sqlite", "/var/lib/websf/uploads.db")
+	// db, err = sql.Open("sqlite", "uploads.db")
 	if err != nil {
 		log.Fatal("打开数据库失败:", err)
 	}

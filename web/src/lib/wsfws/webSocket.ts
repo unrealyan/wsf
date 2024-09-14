@@ -1,8 +1,7 @@
 import eventManager, { EventManager } from '../eventManager';
-// import WSFrtcClient from '../wsfrtc/webrtc';
+
 export interface IWebSocket {
     ws: WebSocket | null;
-    eventManager: EventManager;
     role: string;
     connect: (url: string) => void;
     onopen: (event: Event) => void;
@@ -23,15 +22,15 @@ const urlSP = new URLSearchParams(window.location.search);
 const WEBSOCKET_URL = process.env.WEBSOCKET_URL || "";
 const uuidRegex = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 
+
+
+
 export class WSFWebSocket implements IWebSocket {
-    eventManager: EventManager;
     ws!: WebSocket;
     role: string
     protected eventListeners: { [key: string]: Function } = {};
 
     constructor() {
-
-
         let shareId = sessionStorage.getItem("shareId") || "";
         const urlShareId = urlSP.get("s") || "";
         this.role = urlShareId ? "receiver" : "sender"
@@ -49,9 +48,9 @@ export class WSFWebSocket implements IWebSocket {
         if (shareId) {
             wsUrl.searchParams.set("s", shareId);
         }
+        wsUrl.searchParams.set("r", this.role);
 
         this.connect(wsUrl.toString());
-        this.eventManager = eventManager;
     }
     connect(url: string) {
         this.ws = new WebSocket(url);
@@ -80,76 +79,86 @@ export class WSFWebSocket implements IWebSocket {
         this.eventListeners[event]?.(...args);
     }
 
-    onmessage = () => {
-        if (!this.ws) {
-            throw new Error("WebSocket not initialized");
-        }
-
+    onmessageForSender = () => {
         this.ws.onmessage = (e) => {
             let data = JSON.parse(e.data);
 
             // Common events for both sender and receiver
             switch (data.type) {
-                case "user-id":
-
-
-                    this.sendRole(data.shareId, data.userId)
-                    this.emit("SET_SHARE_ID", data.shareId)
-
-                    // new code
-                    this.emit("SET_USER_ID", data.userId)
-                    // this.sendJoin(data.userId)
-
+                case "error":
                     break;
                 case "stats":
-                    this.emit("GET_STATISTICS",{totalFiles:data.totalFiles,totalSize:data.totalSize})
+                    this.emit("GET_STATISTICS", { totalFiles: data.totalFiles, totalSize: data.totalSize })
                     break;
-
-                case "all-receivers":
-
-
-                    this.emit("ALL_RECEIVERS", data.userIds || [])
-                    // this.emit("INITIATE",data)
-                    this.sendUserToReceiver(data.user,sessionStorage.getItem("shareId")||"",data.userIds||[])
-
-
+                case "user-id":
+                    this.emit("SET_SHARE_ID", data.shareId)
+                    this.emit("SET_USER_ID", data.userId)
                     break;
-                case "notice":
-                    this.emit("INIT_RECEIVER", data)
-                    
-                    break;
-                case "request-status":
-                     this.emit("ACCEPT", data)
-                    break;
-                case "accept-request":
-                     this.emit("SEND_FILE",data)
-                    break;
-                case "offer":
-
-
-                    // new code
-
-                     this.emit("ACCEPT_OFFER_AND_SEND_ANSWER", data.sdp)
-                    // this.emit("GET_TARGET_ID",data.userId)
-                    // this.emit("GET_SHARE_ID",data.shareId)
-
+                case "request-file":
+                    this.emit("CREATE_RECEIVER", data)
                     break;
                 case "answer":
-
-                    // new code
-
-                    // this.emit("ACCEPT_ANSWER_AND_SEND_CANDIDATE", data)
                     this.emit("ACCEPT_ANSWER", data.sdp)
-                    // this.emit("GET_ANSWER",data.sdp)
                     break;
                 case "new-ice-candidate":
                     const candidate = new RTCIceCandidate(data.candidate);
-                    this.emit("ACCEPT_CANDIDATE_AND_EXCHANGE",candidate)
-
+                    this.emit("ACCEPT_CANDIDATE_AND_EXCHANGE", candidate)
+                    break;
+                case "receiver-offline":
+                    this.emit("RECEIVER_OFFLINE",data.receiver)
                     break;
             }
         }
-    };
+    }
+
+    onmessageForReceiver = () => {
+
+        this.ws.onmessage = (e) => {
+            let data = JSON.parse(e.data);
+            switch (data.type) {
+                case "error":
+                    this.emit("SET_OFFLINE", data)
+                    break;
+                case "stats":
+                    this.emit("GET_STATISTICS", { totalFiles: data.totalFiles, totalSize: data.totalSize })
+                    break;
+                case "user-id":
+                    this.emit("SET_SHARE_ID", data.shareId)
+                    this.emit("SET_USER_ID", data.userId)
+                    this.emit("SET_TARGETID", data.target)
+                    this.emit("INIT_RECEIVER", data)
+                    // send file request
+                    this.sendFileRequest({ target: data.target, userId: data.userId })
+                    break;
+                case "sender-online":
+                    this.emit("SET_ONLINE", data)
+                    break;
+                case "file-ready":
+                    this.emit("INIT_RECEIVER", data)
+                    this.sendFileRequest({ target: data.target, userId: data.userId })
+                    break;
+                case "offer":
+                    this.emit("ACCEPT_OFFER_AND_SEND_ANSWER", data.sdp)
+                    break;
+    
+            }
+        }
+    }
+
+    onmessage = () => {
+        if (!this.ws) {
+            throw new Error("WebSocket not initialized");
+        }
+
+        if (this.role === "sender") {
+            this.onmessageForSender()
+        }
+
+        if (this.role === "receiver") {
+            this.onmessageForReceiver()
+        }
+    }
+
     onerror = (event: Event) => {
 
     };
@@ -173,6 +182,15 @@ export class WSFWebSocket implements IWebSocket {
 
     };
 
+    sendFileReadyNotice = (userId:string,shareId:string)=>{
+        let data = JSON.stringify({
+            type:"receivers-notice",
+            userId,
+            shareId
+        })
+        this.ws?.send(data)
+    }
+
     sendRole = (shareId: string, userId: string) => {
         let data = JSON.stringify({
             type: this.role,
@@ -191,38 +209,47 @@ export class WSFWebSocket implements IWebSocket {
         }));
     }
 
-    sendShareFileInfo = ({senderId, sharerId,receiverId,filename,fileSize}:any)=>{
+    sendShareFileInfo = ({ senderId, sharerId, receiverId, filename, fileSize }: any) => {
 
         this.ws?.send(JSON.stringify({
             type: "request-status",
             sharerId,
-            target:receiverId,
-            userId:senderId,
+            target: receiverId,
+            userId: senderId,
             filename,
             fileSize
         }));
     }
 
-    sendUserToReceiver = (user: string, shareId: string, userIds: string[]) => {
+    sendUserToReceiver = (user: string, shareId: string, userIds: string[], filename: string) => {
 
         userIds.forEach((userId: string) => {
             let data = JSON.stringify({
                 type: "notice",
                 userId: user,
                 shareId,
-                target: userId
+                target: userId,
+                filename
             })
             this.ws?.send(data)
         })
     }
 
-    acceptFile = ({senderId, sharerId,receiverId,filename,fileSize}:any)=>{
+    sendFileRequest = ({ target, userId }: { target: string, userId: string }) => {
+        this.ws?.send(JSON.stringify({
+            type: "request-file",
+            target,
+            userId
+        }))
+    }
+
+    acceptFile = ({ senderId, sharerId, receiverId, filename, fileSize }: any) => {
 
         this.ws?.send(JSON.stringify({
             type: "accept-request",
             sharerId,
-            target:receiverId,
-            userId:senderId,
+            target: receiverId,
+            userId: senderId,
             filename,
             fileSize
         }));

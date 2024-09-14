@@ -7,9 +7,9 @@ export default function Desc (){
     </p>
     <h3 class="text-base font-medium mb-2 text-white">How to use:</h3>
     <ol class="list-decimal list-inside text-sm text-gray-300 space-y-1">
+      <li>Select and send your file</li>
       <li>Share the link below with the recipient</li>
       <li>Wait for connection</li>
-      <li>Select and send your file</li>
     </ol>
   </div>
 }

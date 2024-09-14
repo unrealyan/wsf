@@ -26,9 +26,9 @@ export default defineConfig({
   server: {
     // origin:"wsf.io",
     cors:true,
-    hmr:{
-      host:"wsf.io",
-    },
+    // hmr:{
+    //   host:"wsf.io",
+    // },
     host:true,
     port: 3000,
   },

@@ -1,12 +1,11 @@
-import { createEffect, createSignal, onMount } from "solid-js"
+import { batch, createEffect } from "solid-js"
 import { formatBytes } from "../lib/fileUtil";
-import { useStore,UploadStoreManager } from "../lib/store";
-import eventManager, { EventManager } from '../lib/eventManager';
+import { useStore,} from "../lib/store";
 
-function Upload(props:any) {
-    const [state,action] = useStore()
-    const[ ,]= createSignal(new UploadStoreManager(state,action))
+function Upload(props: any) {
+    const [state, action] = useStore()
     let drapRef: HTMLDivElement
+
 
     createEffect(() => {
         if (drapRef) {
@@ -18,14 +17,9 @@ function Upload(props:any) {
 
     const change = (event: any) => {
         let files = event.currentTarget.files
-        // props.setStore("file", () => files[0])
-        props.onFileUpload(files)
-        // eventManager.emit("CHANGE_FILES",files[0])
+
         action.setFile(files[0])
-        // action.setUserList(state.userList.map(user=>{
-        //     let nuser = {...user,filename:files[0].name}
-        //     return nuser
-        // }))
+
     }
 
     const dragStart = (event: any) => {
@@ -35,8 +29,6 @@ function Upload(props:any) {
     const dragOver = (event: any) => {
         console.log('File is inside the drag area');
         event.preventDefault()
-        // event.stopPropagation()  
-
     }
 
     const drop = (event: any) => {
@@ -48,32 +40,27 @@ function Upload(props:any) {
                 // If dropped items aren't files, reject them
                 if (item.kind === "file") {
                     const file = item.getAsFile();
-                    console.log(`… file[${i}].name = ${file.name}`);
-                    // props.setStore("file", () => file)
                     action.setFile(file)
-                    // action.setUserList(state.userList.map((user:any)=>{
-                    //     user.filename=file.name
-                    //     return user
-                    // }))
-                   
                 }
             });
 
         }
     }
 
-    const deleteFile = () =>{
-        // props.setStore("file", () => null)
-        action.setFile(null)
+    const deleteFile = () => {
+        batch(() => {
+            action.setFile(null)
+            action.setIsShare(false)
+        })
     }
 
     return (
         <div class="col-span-full w-[90%] bg-white p-10 mt-8 md:mt-0 mr-auto ml-auto rounded">
             <label for="cover-photo" class="block font-medium leading-6 text-gray-900 text-2xl m-10">WebRTC File Sharing</label>
-            <div data-progress="45%" class="m-4 flex justify-center rounded-lg border border-dashed border-gray-900/25 px-6 py-6 relative" ref={el => drapRef=el}>
-                {state.file ? <div class="hover:cursor-pointer hover:text-gray-200" onClick={()=>!state.upload.disable && deleteFile()} title="remove">
-                    <p class="h-12 flex justify-center items-center">{state.file.name}<span class="text-gray-400 ml-4">{formatBytes(state.file?.size||0)}</span></p>
-                    
+            <div data-progress="45%" class="m-4 flex justify-center rounded-lg border border-dashed border-gray-900/25 px-6 py-6 relative" ref={el => drapRef = el}>
+                {state.file ? <div class="hover:cursor-pointer hover:text-gray-200" onClick={() => !state.upload.disable && deleteFile()} title="remove">
+                    <p class="h-12 flex justify-center items-center">{state.file.name}<span class="text-gray-400 ml-4">{formatBytes(state.file?.size || 0)}</span></p>
+
 
                 </div> :
                     <div class="text-center">
@@ -83,7 +70,7 @@ function Upload(props:any) {
                         <div class="mt-4 flex text-sm leading-6 text-gray-600">
                             <label for="file-upload" class="relative cursor-pointer rounded-md bg-white font-semibold text-indigo-600 focus-within:outline-none focus-within:ring-2 focus-within:ring-indigo-600 focus-within:ring-offset-2 hover:text-indigo-500">
                                 <span>Upload a file</span>
-                                <input id="file-upload" name="file-upload" type="file" class="sr-only" onChange={(e) =>!state.upload.disable && change(e)} disabled={state.upload.disable}/>
+                                <input id="file-upload" name="file-upload" type="file" class="sr-only" onChange={(e) => !state.upload.disable && change(e)} disabled={state.upload.disable} />
                             </label>
                             <p class="pl-1">or drag and drop</p>
                         </div>
