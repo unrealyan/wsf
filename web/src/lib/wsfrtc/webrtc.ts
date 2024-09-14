@@ -69,7 +69,6 @@ class WSFWebRTCImpl implements WSFWebRTC {
     private fileWriter: FileSystemWritableFileStream | null = null
     file!: File | null;
     private _onmessage: (event: any) => void;
-
     constructor({ role, peerId, sharerId, selfId }: WSFWebRTCType) {
 
         this.role = role
@@ -92,7 +91,6 @@ class WSFWebRTCImpl implements WSFWebRTC {
 
         // Add onicecandidate event listener here
         this.webrtcPeer.onicecandidate = (event) => {
-            console.log("onicecandidate event triggered", event);
             if (event.candidate && this.isReadyToSendIceCandidates) {
                 console.log("ICE candidate:", event.candidate);
                 this.onIceCandidate(event.candidate);
@@ -127,6 +125,7 @@ class WSFWebRTCImpl implements WSFWebRTC {
                         break;
                     case "failed":
                         console.log("Error");
+                        this.webrtcPeer.close()
                         break;
                     default:
                         console.log("Unknown");
@@ -360,6 +359,11 @@ class WSFWebRTCImpl implements WSFWebRTC {
 
         recieveChannel.addEventListener("error", (err) => {
             console.log("Error:", err);
+            this.dispatch({
+                type:"error",
+                message:"receiver channel error"
+            })
+            recieveChannel.close()
         });
 
         let fileInfo: { name: string, size: number };
@@ -376,6 +380,7 @@ class WSFWebRTCImpl implements WSFWebRTC {
                 this.isReceiving = true;
                 console.log("receiver start");
                 fileInfo = JSON.parse(recieveChannel.label);
+                console.log(fileInfo)
                 this.receivedSize = 0;
                 this.startTime = Date.now();
                 this.lastUpdateTime = this.startTime;
@@ -398,6 +403,7 @@ class WSFWebRTCImpl implements WSFWebRTC {
                     this.messageHandler = null;
                 }
                 recieveChannel.close();
+                this.webrtcPeer.close()
                 fileReceiver.fileInfo = fileInfo;
                 this.fileWriter = null;
                 console.log('File received, size:', this.receivedSize);

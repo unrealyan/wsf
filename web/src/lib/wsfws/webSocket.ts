@@ -134,6 +134,7 @@ export class WSFWebSocket implements IWebSocket {
                     this.emit("SET_ONLINE", data)
                     break;
                 case "file-ready":
+                    this.emit("INIT_RECEIVER", data)
                     this.sendFileRequest({ target: data.target, userId: data.userId })
                     break;
                 case "offer":
@@ -235,7 +236,6 @@ export class WSFWebSocket implements IWebSocket {
     }
 
     sendFileRequest = ({ target, userId }: { target: string, userId: string }) => {
-        console.log("send file request")
         this.ws?.send(JSON.stringify({
             type: "request-file",
             target,

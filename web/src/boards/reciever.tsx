@@ -46,9 +46,12 @@ export default function Receiver(props: any) {
     const onInitReceiver = (data: any) => {
         Promise.all([action.setUserId(data.userId), action.setTargetId(data.target), action.setShareId(data.shareId)]).then(() => {
             let webrtc = new WSFWebRTCImpl({ role: "receiver", peerId: state.targetId, sharerId: state.shareId, selfId: state.userId })
-            webrtc?.bindEvents();
-            webrtc.onmessage = handleWebRTCMessage
             setWebRTCReceiver(webrtc)
+            const currentReceiver = webRTCReceiver(); // 确保获取当前的 webRTCReceiver
+            if (currentReceiver) { // 检查是否有效
+                currentReceiver.onmessage = handleWebRTCMessage; // 赋值
+                currentReceiver.bindEvents();
+            }
         })
     }
 

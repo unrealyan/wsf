@@ -77,7 +77,9 @@ export default function Sender() {
         webrtc.bindEvents()
         webrtc.sendOffer()
         webrtc.onmessage = handleWebRTCMessage
-        action.setReceivers([...state.receivers, receiver])
+        let receivers =  [...state.receivers]
+        receivers= receivers.filter(rece=>rece.id != data.userId && rece.webrtc)
+        action.setReceivers([...receivers, receiver])
     }
 
     const getShareId = (id: string) => {

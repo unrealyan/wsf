@@ -245,29 +245,7 @@ func handleMessage(shareId, userId string, msg []byte) {
 	}
 
 	switch data["type"] {
-	case "sender":
-		connMutex.Lock()
-		senders[shareId] = append(senders[shareId], userId)
-		connMutex.Unlock()
-		sendReceiversList(shareId)
 
-	case "receiver":
-		connMutex.Lock()
-		receivers[shareId] = append(receivers[shareId], userId)
-		connMutex.Unlock()
-		sendReceiversList(shareId)
-
-	case "initiate":
-		target := data["target"].(string)
-		connMutex.Lock()
-		if conn, ok := connections[shareId][userId]; ok {
-			conn.WriteJSON(map[string]interface{}{
-				"type":   "join",
-				"userId": userId,
-				"target": target,
-			})
-		}
-		connMutex.Unlock()
 	case "receivers-notice":
 		sendReceivers(shareId, map[string]interface{}{
 			"type":   "file-ready",
