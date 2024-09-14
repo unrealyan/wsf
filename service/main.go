@@ -73,7 +73,7 @@ func main() {
 
 	http.HandleFunc("/ws", handleWebSocket)
 
-	// go broadcastStats()
+	go broadcastStats()
 
 	log.Printf("WebSocket server listening on %d", WEBSOCKET_SERVER_PORT)
 	if err := http.ListenAndServe(fmt.Sprintf(":%d", WEBSOCKET_SERVER_PORT), nil); err != nil {
@@ -382,8 +382,8 @@ func removeElement(slice []string, element string) []string {
 
 func initDB() {
 	var err error
-	// db, err = sql.Open("sqlite", "/var/lib/websf/uploads.db")
-	db, err = sql.Open("sqlite", "uploads.db")
+	db, err = sql.Open("sqlite", "/var/lib/websf/uploads.db")
+	// db, err = sql.Open("sqlite", "uploads.db")
 	if err != nil {
 		log.Fatal("打开数据库失败:", err)
 	}
