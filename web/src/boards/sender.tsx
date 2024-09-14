@@ -96,14 +96,8 @@ export default function Sender() {
 
     const shareFile = async () => {
         action.setIsShare(true)
+        WSClient.sendFileReadyNotice(state.userId,state.shareId)
     }
-
-    const sendFiles = async () => {
-        state.userList.forEach((user: Peer) => {
-            user.webrtc?.setFile(state.file)
-            user.webrtc?.sendOffer()
-        })
-    };
 
     return (
         <>

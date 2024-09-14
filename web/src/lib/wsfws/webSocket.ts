@@ -133,6 +133,9 @@ export class WSFWebSocket implements IWebSocket {
                 case "sender-online":
                     this.emit("SET_ONLINE", data)
                     break;
+                case "file-ready":
+                    this.sendFileRequest({ target: data.target, userId: data.userId })
+                    break;
                 case "offer":
                     this.emit("ACCEPT_OFFER_AND_SEND_ANSWER", data.sdp)
                     break;
@@ -177,6 +180,15 @@ export class WSFWebSocket implements IWebSocket {
     sendError = (data: string) => {
 
     };
+
+    sendFileReadyNotice = (userId:string,shareId:string)=>{
+        let data = JSON.stringify({
+            type:"receivers-notice",
+            userId,
+            shareId
+        })
+        this.ws?.send(data)
+    }
 
     sendRole = (shareId: string, userId: string) => {
         let data = JSON.stringify({

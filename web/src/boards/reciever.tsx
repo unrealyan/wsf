@@ -20,7 +20,7 @@ export default function Receiver(props: any) {
         WSClient.on("SET_OFFLINE", setOffline)
         WSClient.on("SET_ONLINE", setOnline)
 
-    })
+    }) 
 
     const setOffline = (data: any) => {
         action.setOffline({ status: true, message: data.message })
