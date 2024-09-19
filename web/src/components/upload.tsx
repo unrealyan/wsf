@@ -1,11 +1,15 @@
-import { batch, createEffect } from "solid-js"
+import { batch, createEffect, createSignal } from "solid-js"
 import { formatBytes } from "../lib/fileUtil";
 import { useStore,} from "../lib/store";
+import WSClient from "../lib/wsfws/webSocket";
 
 function Upload(props: any) {
     const [state, action] = useStore()
     let drapRef: HTMLDivElement
 
+    const [file, setFile] = createSignal<File>();
+
+    createEffect(()=>shareFile(file()))
 
     createEffect(() => {
         if (drapRef) {
@@ -15,10 +19,15 @@ function Upload(props: any) {
         }
     })
 
+    const shareFile = async (file:File|undefined) => {
+        WSClient.sendFileReadyNotice(state.userId,state.shareId)
+    }
+
     const change = (event: any) => {
         let files = event.currentTarget.files
 
         action.setFile(files[0])
+        setFile(files[0])
 
     }
 
@@ -41,6 +50,7 @@ function Upload(props: any) {
                 if (item.kind === "file") {
                     const file = item.getAsFile();
                     action.setFile(file)
+                    setFile(file)
                 }
             });
 

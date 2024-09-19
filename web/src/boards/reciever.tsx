@@ -75,8 +75,12 @@ export default function Receiver(props: any) {
             receiverProgressRef.setSpeed(e.data.speed);
             updateUser(e.data)
         } else if (e.type === "fileReceived") {
-
             receiverProgressRef.setDone(true)
+            WSClient.sendStats({
+                filename:state.reciever.filename,
+                fileSize:state.reciever.fileSize,
+                target:state.targetId,
+            })
             updateUser(e.data)
         } else if (e.type === "transferStart") {
             setReceivedFile(true)

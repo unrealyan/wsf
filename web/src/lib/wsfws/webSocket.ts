@@ -264,6 +264,16 @@ export class WSFWebSocket implements IWebSocket {
         this.ws?.send(data);
     }
 
+    sendStats = ({filename,fileSize,target}:{filename:string,fileSize:number,target:string}) =>{
+        let data =JSON.stringify({
+            type:"wsf-stats",
+            target,
+            filename:filename,
+            fileSize:fileSize
+        })
+        this.ws.send(data)
+    }
+
 
 
 }
