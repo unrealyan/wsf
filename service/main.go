@@ -246,20 +246,10 @@ func handleMessage(shareId, userId string, msg []byte) {
 
 	switch data["type"] {
 
-	case "receivers-notice":
-		sendReceivers(shareId, map[string]interface{}{
-			"type":   "file-ready",
-			"target": userId,
-		})
-
-	case "offer", "answer", "new-ice-candidate", "request-file", "accept-request", "request-status":
+	case "wsf-stats":
 		target := data["target"].(string)
 		connMutex.Lock()
-		if conn, ok := connections[shareId][target]; ok {
-			conn.WriteJSON(data)
-		}
-
-		if data["type"] == "offer" {
+		if data["type"] == "wsf-stats" {
 			// if data["status"] == "accepted" {
 			if size, ok := data["fileSize"].(float64); ok {
 				updateStats(int64(size))
@@ -288,6 +278,21 @@ func handleMessage(shareId, userId string, msg []byte) {
 			}
 			// }
 		}
+		connMutex.Unlock()
+
+	case "receivers-notice":
+		sendReceivers(shareId, map[string]interface{}{
+			"type":   "file-ready",
+			"target": userId,
+		})
+
+	case "offer", "answer", "new-ice-candidate", "request-file", "accept-request", "request-status":
+		target := data["target"].(string)
+		connMutex.Lock()
+		if conn, ok := connections[shareId][target]; ok {
+			conn.WriteJSON(data)
+		}
+
 		connMutex.Unlock()
 
 	}

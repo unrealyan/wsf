@@ -1,4 +1,4 @@
-import { createSignal, onMount, Show } from "solid-js";
+import { createEffect, createSignal, onMount, Show } from "solid-js";
 import Upload from "../components/upload";
 import { useStore, Peer, Receiver } from "../lib/store";
 import WSFWebRTCImpl from "../lib/wsfrtc/webrtc";
@@ -20,6 +20,7 @@ export default function Sender() {
         WSClient.on("CREATE_RECEIVER", createReceiver)
         WSClient.on("RECEIVER_OFFLINE", onReceiverOffline)
     })
+
 
     const getSelfId = (id: string) => {
         action.setUserId(id)
@@ -105,10 +106,10 @@ export default function Sender() {
         <>
             <Upload onFileUpload={handleFileUpload}>
             </Upload>
-            <button class={`text-white bg-blue-500 hover:bg-blue-700 font-bold py-2 px-4 rounded mt-6 ${(!state.file || state.isSahre) ? "cursor-not-allowed bg-slate-400 hover:bg-slate-400" : ""}`} onClick={shareFile} disabled={(!state.file) || (state.isSahre)}>
+            {/* <button class={`text-white bg-blue-500 hover:bg-blue-700 font-bold py-2 px-4 rounded mt-6 ${(!state.file || state.isSahre) ? "cursor-not-allowed bg-slate-400 hover:bg-slate-400" : ""}`} onClick={shareFile} disabled={(!state.file) || (state.isSahre)}>
                 Share Files
-            </button>
-            <Show when={state.file && state.isSahre}>
+            </button> */}
+            <Show when={state.file}>
                 <Copy text={`${location.origin}/?s=${state.shareId}`} onCopy={() => console.log('Copied!')}>
                     <p class="text-gray-400">{`${location.origin}/?s=${state.shareId}`}</p>
                 </Copy>
