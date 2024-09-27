@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="google-signin-scope" content="profile email" />
+    <meta name="google-signin-client_id"
+        content="282838711863-da7a2cj5pj2a4c8t1l9vnk3nqqgfa6nf.apps.googleusercontent.com" />
+    <link rel="shortcut icon" type="image/ico" href="/src/assets/favicon.ico" />
+
+    <title>Secure P2P File Transfer | WebRTC File Sharing</title>
+    <meta name="description"
+        content="Fast, secure, and efficient peer-to-peer file transfer using WebRTC. No server storage, direct device-to-device file sharing for maximum privacy and speed.">
+
+    <meta name="keywords" content="WebRTC, P2P file transfer, secure file sharing, peer-to-peer, direct file transfer">
+    <meta name="author" content="Your Company Name">
+
+    <link rel="canonical" href="https://wsf.ptcl.one" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://wsf.ptcl.one">
+    <meta property="og:title" content="Secure P2P File Transfer | WebRTC File Sharing">
+    <meta property="og:description"
+        content="Fast, secure, and efficient peer-to-peer file transfer using WebRTC. No server storage, direct device-to-device file sharing for maximum privacy and speed.">
+    <meta property="og:image" content="https://wsf.ptcl.one/logo.jpg">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://wsf.ptcl.one">
+    <meta property="twitter:title" content="Secure P2P File Transfer | WebRTC File Sharing">
+    <meta property="twitter:description"
+        content="Fast, secure, and efficient peer-to-peer file transfer using WebRTC. No server storage, direct device-to-device file sharing for maximum privacy and speed.">
+    <meta property="twitter:image" content="https://wsf.ptcl.one/logo.jpg">
+    <script src="https://apis.google.com/js/platform.js" async defer></script>
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/hellojs/1.20.0/hello.all.js" integrity="sha512-vXEduQGpC3Rnd3sN2yp6AU+sERb+Y0aaKDLGOaCA2r1PbsxvYtfznJr4b2qTZt5rHjfBv82bW1RDIx7irnT/fQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script> -->
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-YN205735KG"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+        gtag('config', 'G-YN205735KG');
+    </script>
+</head>
+
+<body>
+    <noscript>Login</noscript>
+    <div id="root"></div>
+    <!-- <script src="/src/index.tsx" type="module"></script> -->
+    <button onclick="oauthSignIn()">google</button>
+    <script>
+        function oauthSignIn() {
+            // Google's OAuth 2.0 endpoint for requesting an access token
+            var oauth2Endpoint = 'https://accounts.google.com/o/oauth2/v2/auth';
+
+            // Create <form> element to submit parameters to OAuth 2.0 endpoint.
+            var form = document.createElement('form');
+            form.setAttribute('method', 'GET'); // Send as a GET request.
+            form.setAttribute('action', oauth2Endpoint);
+
+            // Parameters to pass to OAuth 2.0 endpoint.
+            var params = {
+                'client_id': '78725862759-ikks52n8tgqgsmi67r2ts14i8qg9sffn.apps.googleusercontent.com',
+                'redirect_uri': 'http://localhost:3000/redirect.html',
+                'response_type': 'token',
+                'scope': 'https://www.googleapis.com/auth/drive.metadata.readonly',
+                'include_granted_scopes': 'true',
+                'state': 'pass-through value'
+            };
+
+            // Add form parameters as hidden input values.
+            for (var p in params) {
+                var input = document.createElement('input');
+                input.setAttribute('type', 'hidden');
+                input.setAttribute('name', p);
+                input.setAttribute('value', params[p]);
+                form.appendChild(input);
+            }
+
+            // Add form to page and submit it to open the OAuth 2.0 endpoint.
+            document.body.appendChild(form);
+            form.submit();
+        }
+    </script>
+</body>
+
+</html>

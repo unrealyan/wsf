@@ -1,9 +1,14 @@
 /* @refresh reload */
 import { render } from 'solid-js/web';
 import StoreProvider from './lib/store'
+import { Router, Route } from "@solidjs/router";
 
 import './index.css';
 import App from './App';
+
+import Home from "./pages/home"
+import Login from "./pages/login"
+import Redirect from './pages/redirect'
 
 const root = document.getElementById('root');
 
@@ -13,4 +18,10 @@ if (import.meta.env.DEV && !(root instanceof HTMLElement)) {
   );
 }
 
-render(() => <StoreProvider><App /></StoreProvider>, root!);
+render(() => <StoreProvider>
+  <Router root={App}>
+    <Route path="/" component={Home} />
+    <Route path="/signin" component={Login} />
+    <Route path="/redirect" component={Redirect} />
+  </Router>
+</StoreProvider>, root!);

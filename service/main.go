@@ -1,6 +1,8 @@
 package main
 
 import (
+	"app/api"
+	"app/pkg/database"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -15,6 +17,7 @@ import (
 
 	"database/sql"
 
+	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	_ "modernc.org/sqlite"
@@ -66,19 +69,44 @@ type UploadRecord struct {
 var db *sql.DB
 
 func main() {
+
+	db, err := database.New("uploads.db")
+	if err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
+	}
+	defer db.Close()
+
 	loadStats()
 
 	initDB()
 	defer db.Close()
 
-	http.HandleFunc("/ws", handleWebSocket)
+	gin.SetMode(gin.DebugMode)
+	r := gin.Default()
 
-	go broadcastStats()
+	api.SetupRoutes(r, db)
 
-	log.Printf("WebSocket server listening on %d", WEBSOCKET_SERVER_PORT)
-	if err := http.ListenAndServe(fmt.Sprintf(":%d", WEBSOCKET_SERVER_PORT), nil); err != nil {
-		log.Fatal("ListenAndServe: ", err)
+	// 创建一个新的http.ServeMux来处理WebSocket连接
+	wsMux := http.NewServeMux()
+	wsMux.HandleFunc("/ws", handleWebSocket)
+
+	// 启动WebSocket服务器
+	go func() {
+		log.Printf("WebSocket服务器正在监听端口 %d", WEBSOCKET_SERVER_PORT)
+		if err := http.ListenAndServe(fmt.Sprintf(":%d", WEBSOCKET_SERVER_PORT), wsMux); err != nil {
+			log.Fatal("ListenAndServe: ", err)
+		}
+	}()
+
+	// 启动Gin服务器
+	log.Println("Gin服务器正在启动...")
+	r.NoRoute(func(c *gin.Context) {
+		c.JSON(404, gin.H{"code": "PAGE_NOT_FOUND", "message": "Page not found"})
+	})
+	if err := r.Run(":8890"); err != nil {
+		log.Fatal("运行Gin服务器失败: ", err)
 	}
+
 }
 
 func loadStats() {
@@ -387,8 +415,8 @@ func removeElement(slice []string, element string) []string {
 
 func initDB() {
 	var err error
-	db, err = sql.Open("sqlite", "/var/lib/websf/uploads.db")
-	// db, err = sql.Open("sqlite", "uploads.db")
+	// db, err = sql.Open("sqlite", "/var/lib/websf/uploads.db")
+	db, err = sql.Open("sqlite", "uploads.db")
 	if err != nil {
 		log.Fatal("打开数据库失败:", err)
 	}
