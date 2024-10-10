@@ -1,4 +1,3 @@
-import eventManager, { EventManager } from '../eventManager';
 
 export interface IWebSocket {
     ws: WebSocket | null;
@@ -59,7 +58,7 @@ export class WSFWebSocket implements IWebSocket {
     }
 
     connect(url: string) {
-        this.ws = new WebSocket(url);
+        this.ws = new WebSocket(url,["token",localStorage.token]);
         this.ws.onopen = () => console.log("Connected to " + url);
         this.ws.onclose = () => {
             console.log("Disconnected from " + url)

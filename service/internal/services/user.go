@@ -4,7 +4,9 @@ import (
 	"app/internal/models"
 	"app/internal/repositories"
 	"errors"
+	"time"
 
+	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -73,4 +75,35 @@ func (s *UserService) Login(email, password string) (*models.User, error) {
 	user.Password = ""
 
 	return user, nil
+}
+
+var jwtKey = []byte("your_secret_key") // 在实际应用中,请使用更安全的密钥存储方式
+
+func GenerateToken(user *models.User) (string, error) {
+	expirationTime := time.Now().Add(24 * time.Hour)
+	claims := &jwt.RegisteredClaims{
+		ExpiresAt: jwt.NewNumericDate(expirationTime),
+		IssuedAt:  jwt.NewNumericDate(time.Now()),
+		Subject:   user.UserID,
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(jwtKey)
+}
+
+func ValidateToken(tokenString string) (*jwt.RegisteredClaims, error) {
+	claims := &jwt.RegisteredClaims{}
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+		return jwtKey, nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if !token.Valid {
+		return nil, errors.New("invalid token")
+	}
+
+	return claims, nil
 }

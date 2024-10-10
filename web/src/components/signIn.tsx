@@ -1,6 +1,8 @@
+import { useNavigate } from "@solidjs/router";
+
 export default function SignIn(){
 
-
+    const navigate = useNavigate();
     const onOauthSignin = ()=>{
         // Google's OAuth 2.0 endpoint for requesting an access token
         let oauth2Endpoint = 'https://accounts.google.com/o/oauth2/v2/auth';
@@ -34,5 +36,5 @@ export default function SignIn(){
         form.submit();
     }
 
-    return <div class="mt-4"><span class="text-white hover:cursor-pointer" onClick={onOauthSignin}>SignIn</span></div>
+    return <div class="mt-4"><span class="text-white hover:cursor-pointer" onClick={()=> navigate("/auth")}>SignIn</span></div>
 }

@@ -1,4 +1,3 @@
-
 interface ApiClient {
     baseUrl: string;
     get<P extends string,T>(url: string, params: P): Promise<T>
@@ -10,9 +9,23 @@ interface ApiClient {
 
 class ApiClientImpl implements ApiClient {
     baseUrl: string;
+    private token: string | null;
+
     constructor(path: string) {
-        this.baseUrl = path
+        this.baseUrl = path;
+        this.token = localStorage.token||"";
     }
+
+    private getHeaders(): Headers {
+        const headers = new Headers({
+            'Content-Type': 'application/json',
+        });
+        if (this.token) {
+            headers.append('Authorization', `Bearer ${this.token}`);
+        }
+        return headers;
+    }
+
     async get<P extends Object, T>(url: string, params?: P): Promise<T>  {
         const queryParams = new URLSearchParams();
         if (params) {
@@ -22,7 +35,10 @@ class ApiClientImpl implements ApiClient {
         }
         url = this.baseUrl + url + "?"+queryParams.toString();
         try {
-            const response = await fetch(url, { method: "GET" });
+            const response = await fetch(url, { 
+                method: "GET",
+                headers: this.getHeaders()
+            });
             if (!response.ok) {
                 throw new Error(`Response status: ${response.status}`);
             }
@@ -37,6 +53,7 @@ class ApiClientImpl implements ApiClient {
         try {
             const response = await fetch(url,{
                 method:"POST",
+                headers: this.getHeaders(),
                 body: JSON.stringify(data)
             })
             if (response.status == 400) {

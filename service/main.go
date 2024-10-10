@@ -2,6 +2,7 @@ package main
 
 import (
 	"app/api"
+	"app/internal/services"
 	"app/pkg/database"
 	"encoding/json"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -43,6 +45,7 @@ var (
 		CheckOrigin: func(r *http.Request) bool {
 			return true
 		},
+		Subprotocols: []string{"token"},
 	}
 
 	stats      Statistics
@@ -166,6 +169,19 @@ func broadcastStats() {
 
 func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	forwardedFor := r.Header.Get("X-Forwarded-For")
+	subprotocols := r.Header.Get("Sec-Websocket-Protocol")
+	log.Println(subprotocols)
+	userId := ""
+	if subprotocols != "" {
+		token := strings.Split(subprotocols, ", ")[1]
+
+		claims, err := services.ValidateToken(token)
+		if err != nil {
+
+			return
+		}
+		userId = claims.Subject
+	}
 	if forwardedFor != "" {
 		r.RemoteAddr = forwardedFor
 	}
@@ -185,7 +201,7 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
-	userId := assignUserId()
+	// userId := assignUserId()
 	if role == "sender" {
 		if sender := getSender(shareId); sender != "" {
 			userId = sender

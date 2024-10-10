@@ -189,5 +189,15 @@ func (h *UserHandler) Login(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "登录成功", "user": user})
+	token, err := services.GenerateToken(user)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "生成token失败"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "登录成功",
+		"user":    user,
+		"token":   token,
+	})
 }

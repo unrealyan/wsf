@@ -32,6 +32,7 @@ export default function Auth() {
       isLogin() ? await login().then((res:any)=>{
         console.log(res.user)
         localStorage.setItem("user",JSON.stringify(res.user))
+        localStorage.setItem("token",res.token)
       }): await register()
       // 登录或注册成功后跳转到个人资料页面
       navigate("/profile");
