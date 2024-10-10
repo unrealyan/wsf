@@ -8,18 +8,27 @@ import Copy from "../components/copy";
 
 export default function Sender() {
 
-    const [state, action] = useStore()
+    const [state, action,{notification,addNotification}] = useStore()
 
     const [files, setFiles] = createSignal<File[]>([]);
 
-    onMount(() => {
-        WSClient.onmessage()
 
-        WSClient.on("SET_SHARE_ID", getShareId)
-        WSClient.on("SET_USER_ID", getSelfId)
-        WSClient.on("CREATE_RECEIVER", createReceiver)
-        WSClient.on("RECEIVER_OFFLINE", onReceiverOffline)
+    onMount(() => {
+      
     })
+
+    createEffect(()=>{
+        let notice = notification();
+        if (notice.message === "LOGIN_BY_GOOGLE") {
+            WSClient.start()
+
+            WSClient.on("SET_SHARE_ID", getShareId)
+            WSClient.on("SET_USER_ID", getSelfId)
+            WSClient.on("CREATE_RECEIVER", createReceiver)
+            WSClient.on("RECEIVER_OFFLINE", onReceiverOffline)
+        }
+    })
+
 
 
     const getSelfId = (id: string) => {

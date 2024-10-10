@@ -125,6 +125,7 @@ class WSFWebRTCImpl implements WSFWebRTC {
                         break;
                     case "failed":
                         console.log("Error");
+                        this.dispatch({type:"error",data:"webrtc connect failed"})
                         this.webrtcPeer.close()
                         break;
                     default:

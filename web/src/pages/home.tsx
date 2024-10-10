@@ -26,10 +26,10 @@ interface SendFile {
   type: string;
 }
 const App: Component = () => {
-  const [state, action]: StoreType = useStore();
+  const [state, action,{addNotification}]: StoreType = useStore();
 
 
-  const [,] = createSignal(new StoreManager({ state, action }))
+  // const [,] = createSignal(new StoreManager({ state, action }))
 
   const location:any = useLocation();
   if (location.state) {
@@ -47,7 +47,6 @@ const App: Component = () => {
     })
 
     WSClient.on("GET_STATISTICS",getStatistics)
-
   });
 
   const getStatistics=({totalFiles,totalSize}:{totalFiles:number,totalSize:number})=>{

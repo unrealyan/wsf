@@ -22,5 +22,7 @@ func SetupRoutes(r *gin.Engine, db *database.SQLite) {
 		api.PUT("/user/:id", userHandler.UpdateUser)
 		api.DELETE("/user/:id", userHandler.DeleteUser)
 		api.GET("/users", userHandler.ListUsers)
+		api.POST("/register", userHandler.Register)
+		api.POST("/login", userHandler.Login)
 	}
 }

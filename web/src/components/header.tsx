@@ -7,12 +7,13 @@ import SingOut from './signOut';
 
 export default function Header() {
 
-    const [state, action]: StoreType = useStore();
+    const [state, action,{addNotification}]: StoreType = useStore();
 
     onMount(() => {
         try {
             let userInfo: UserInfo = JSON.parse(localStorage.user)
             action.setUserInfo(userInfo)
+            addNotification("LOGIN_BY_GOOGLE")
         } catch (err) {
             console.log(err)
         }
@@ -61,7 +62,7 @@ export default function Header() {
         </div>
         {/* <Avatar userId={props.store.userId} /> */}
         {
-            state.userInfo?.picture ? <><Avatar userId={state.userInfo.id.toString()} picture={state.userInfo.picture} /><SingOut/></>: <SignIn/>
+            state.userInfo?.user_id ? <><Avatar userId={state.userInfo.user_id} picture={state.userInfo.picture} /><SingOut/></>: <SignIn/>
         }
         
     </header>

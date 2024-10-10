@@ -1,8 +1,7 @@
 import { createStore } from 'solid-js/store';
-import { Component, createContext, useContext } from 'solid-js';
+import { Accessor, Component, createContext, createSignal, useContext } from 'solid-js';
 
 import WSFWebRTCImpl,{ WSFWebRTC } from './wsfrtc/webrtc';
-import { userInfo } from 'os';
 
 export type UserInfo = {
   id:number|string
@@ -126,8 +125,18 @@ export interface ActionType {
 
 export type StoreType = [
   state: StateType,
-  action: ActionType
+  action: ActionType,
+  notice:{
+    [x: string]: any;
+    notification:Accessor<Notification>,
+    addNotification:(message:string)=>void
+  },
 ]
+
+export type Notification = {
+  id:number
+  message:string
+}
 
 // 创建一个 Store 的上下文，指定类型
 const StoreContext = createContext<StoreType | undefined>(undefined);
@@ -181,6 +190,13 @@ export default function StoreProvider(props: any) {
     },
   });
 
+  const [notification,setNotification ]= createSignal<Notification>({id:Date.now(),message:""})
+
+  const addNotification = (message:string)=>{
+    const newNotification = { id: Date.now(), message };
+    setNotification(newNotification);
+  }
+
   const updateState = (newState: Partial<StateType>) => {
     setState(prev => ({ ...prev, ...newState }));
   };
@@ -211,7 +227,8 @@ export default function StoreProvider(props: any) {
       setIsShare:(isShare:boolean)=>setState("isSahre",isShare),
       setUserInfo:(userInfo:UserInfo)=>setState("userInfo",userInfo),
       setAlertMsg:(msg:AlertMessage)=>setState("alertMsg",msg)
-    }
+    },
+    {notification,addNotification},
   ];
 
   return (

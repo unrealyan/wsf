@@ -10,6 +10,8 @@ import (
 	"app/internal/models"
 	"app/internal/services"
 
+	"crypto/sha256"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -45,10 +47,18 @@ func (h *UserHandler) LoginByGoogle(c *gin.Context) {
 
 	// 处理响应数据
 	// TODO: 解析响应体，处理用户信息
-	var user models.User
-	if err := json.NewDecoder(resp.Body).Decode(&user); err != nil {
+	var goole_user models.GoogleUser
+	if err := json.NewDecoder(resp.Body).Decode(&goole_user); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "无法解析Google返回的用户数据"})
 		return
+	}
+
+	user := models.User{
+		UserID:     goole_user.ID,
+		FamilyName: goole_user.FamilyName,
+		GivenName:  goole_user.GivenName,
+		Name:       goole_user.Name,
+		Picture:    goole_user.Picture,
 	}
 
 	if err := h.service.LoginByGoogle(&user); err != nil {
@@ -136,4 +146,48 @@ func (h *UserHandler) ListUsers(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, users)
+}
+
+func (h *UserHandler) Register(c *gin.Context) {
+	var user models.User
+	if err := c.ShouldBindJSON(&user); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if user.UserID == "" {
+		if user.Email == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "邮箱不能为空"})
+			return
+		}
+		// 使用邮箱生成 UserID
+		hash := sha256.Sum256([]byte(user.Email))
+		user.UserID = fmt.Sprintf("%x", hash)[:11]
+	}
+
+	if err := h.service.Register(&user); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"message": "用户注册成功", "user": user})
+}
+
+func (h *UserHandler) Login(c *gin.Context) {
+	var loginInfo struct {
+		Email    string `json:"email" binding:"required"`
+		Password string `json:"password" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&loginInfo); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	user, err := h.service.Login(loginInfo.Email, loginInfo.Password)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "邮箱或密码错误"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "登录成功", "user": user})
 }

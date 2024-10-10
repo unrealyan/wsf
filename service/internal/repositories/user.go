@@ -3,6 +3,7 @@ package repositories
 import (
 	"app/internal/models"
 	"app/pkg/database"
+	"database/sql"
 	"fmt"
 )
 
@@ -43,8 +44,8 @@ func (r *UserRepository) Create(user *models.User) error {
 		return fmt.Errorf("user_id %s 已存在", user.UserID)
 	}
 
-	query := "INSERT INTO users (user_id, name, email, given_name, family_name, picture) VALUES (?, ?, ?, ?, ?, ?)"
-	result, err := r.db.DB.Exec(query, user.UserID, user.Name, user.Email, user.GivenName, user.FamilyName, user.Picture)
+	query := "INSERT INTO users (user_id, name, email, password, given_name, family_name, picture) VALUES (?, ?, ?, ?, ?, ?, ?)"
+	result, err := r.db.DB.Exec(query, user.UserID, user.Name, user.Email, user.Password, user.GivenName, user.FamilyName, user.Picture)
 	if err != nil {
 		return fmt.Errorf("创建用户时出错: %w", err)
 	}
@@ -64,6 +65,7 @@ func (r *UserRepository) ensureTableExists() error {
 		user_id TEXT NOT NULL UNIQUE,
 		name TEXT NOT NULL,
 		email TEXT NOT NULL UNIQUE,
+		password TEXT,
 		given_name TEXT,
 		family_name TEXT,
 		picture TEXT
@@ -99,8 +101,8 @@ func (r *UserRepository) GetByID(id int64) (*models.User, error) {
 }
 
 func (r *UserRepository) Update(user *models.User) error {
-	query := "UPDATE users SET name = ?, email = ?, given_name = ?, family_name = ?, picture = ? WHERE id = ?"
-	_, err := r.db.DB.Exec(query, user.Name, user.Email, user.GivenName, user.FamilyName, user.Picture, user.ID)
+	query := "UPDATE users SET name = ?, email = ?, password = ?, given_name = ?, family_name = ?, picture = ? WHERE id = ?"
+	_, err := r.db.DB.Exec(query, user.Name, user.Email, user.Password, user.GivenName, user.FamilyName, user.Picture, user.ID)
 	if err != nil {
 		return fmt.Errorf("更新用户时出错: %w", err)
 	}
@@ -134,4 +136,31 @@ func (r *UserRepository) List() ([]*models.User, error) {
 		users = append(users, &user)
 	}
 	return users, nil
+}
+
+func (r *UserRepository) EmailExists(email string) (bool, error) {
+	// 检查表是否存在
+	if err := r.ensureTableExists(); err != nil {
+		return false, fmt.Errorf("确保表存在时出错: %w", err)
+	}
+	query := "SELECT COUNT(*) FROM users WHERE email = ?"
+	var count int
+	err := r.db.DB.QueryRow(query, email).Scan(&count)
+	if err != nil {
+		return false, fmt.Errorf("检查邮箱是否存在时出错: %w", err)
+	}
+	return count > 0, nil
+}
+
+func (r *UserRepository) GetByEmail(email string) (*models.User, error) {
+	query := "SELECT id, user_id, name, email, password, given_name, family_name, picture FROM users WHERE email = ?"
+	var user models.User
+	err := r.db.DB.QueryRow(query, email).Scan(&user.ID, &user.UserID, &user.Name, &user.Email, &user.Password, &user.GivenName, &user.FamilyName, &user.Picture)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("用户不存在")
+		}
+		return nil, fmt.Errorf("获取用户信息时出错: %w", err)
+	}
+	return &user, nil
 }

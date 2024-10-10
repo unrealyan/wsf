@@ -39,13 +39,20 @@ class ApiClientImpl implements ApiClient {
                 method:"POST",
                 body: JSON.stringify(data)
             })
-            if (!response.ok) {
-                throw new Error(`Response status: ${response.status}`);
-            }
+            if (response.status == 400) {
+                throw new Error("api params error")
+            } else if (response.status == 401){
+                throw new Error("login fail")
+            } else if (response.status >400 && response.status <500){
+                throw new Error("api fail")
+            } else if (response.status > 500){
+                throw new Error("system error")
+            } 
+           
             const json = await response.json();
             return json
         }catch (error: any) {
-            return error
+            throw new Error(error);
         }
     }
     put<P,T>(url: string, data: P): Promise<T> {

@@ -3,6 +3,9 @@ package services
 import (
 	"app/internal/models"
 	"app/internal/repositories"
+	"errors"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 type UserService struct {
@@ -35,4 +38,39 @@ func (s *UserService) DeleteUser(id int64) error {
 
 func (s *UserService) ListUsers() ([]*models.User, error) {
 	return s.repo.List()
+}
+
+func (s *UserService) Register(user *models.User) error {
+	// 检查邮箱是否已存在
+	exists, err := s.repo.EmailExists(user.Email)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return errors.New("邮箱已被注册")
+	}
+
+	// 加密密码
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	user.Password = string(hashedPassword)
+
+	// 创建用户
+	return s.repo.Create(user)
+}
+
+func (s *UserService) Login(email, password string) (*models.User, error) {
+	user, err := s.repo.GetByEmail(email)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
+		return nil, errors.New("密码错误")
+	}
+	user.Password = ""
+
+	return user, nil
 }
