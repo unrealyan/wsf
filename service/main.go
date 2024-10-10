@@ -8,11 +8,9 @@ import (
 	"app/pkg/database"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -47,27 +45,7 @@ var (
 		},
 		Subprotocols: []string{"token"},
 	}
-
-	stats      Statistics
-	statsMutex sync.Mutex
-	statsFile  = "stats.json"
 )
-
-type Statistics struct {
-	TotalFiles int64 `json:"totalFiles"`
-	TotalSize  int64 `json:"totalSize"`
-}
-
-type UploadRecord struct {
-	SenderID    string
-	SenderIP    string
-	Filename    string
-	Filesize    int64
-	SendTime    time.Time
-	ReceiverID  string
-	ReceiverIP  string
-	ReceiveTime time.Time
-}
 
 var db *database.SQLite
 
@@ -79,15 +57,14 @@ func main() {
 	}
 	defer db.Close()
 
-	loadStats()
+	// loadStats()
 
 	// initDB()
 
 	uploadsRepo := repositories.NewUploadRepository(db)
 	uploadsService := services.NewUploadService(uploadsRepo)
 
-	defer db.Close()
-
+	go broadcastStats(uploadsService)
 	gin.SetMode(gin.DebugMode)
 	r := gin.Default()
 
@@ -118,50 +95,20 @@ func main() {
 
 }
 
-func loadStats() {
-	data, err := ioutil.ReadFile(statsFile)
-	if err != nil {
-		log.Println("无法读取统计文件，使用默认值")
-		return
-	}
-	err = json.Unmarshal(data, &stats)
-	if err != nil {
-		log.Println("解析统计文件失败，使用默认值")
-	}
-}
-
-func saveStats() {
-	data, err := json.Marshal(stats)
-	if err != nil {
-		log.Println("序列化统计数据失败:", err)
-		return
-	}
-	err = os.WriteFile(statsFile, data, 0644)
-	if err != nil {
-		log.Println("保存统计数据失败:", err)
-	}
-}
-
-func updateStats(fileSize int64) {
-	statsMutex.Lock()
-	defer statsMutex.Unlock()
-
-	stats.TotalFiles++
-	stats.TotalSize += fileSize
-	saveStats()
-}
-
-func broadcastStats() {
+func broadcastStats(uploadsService *services.UploadService) {
 	ticker := time.NewTicker(5 * time.Second)
 	for range ticker.C {
-		statsMutex.Lock()
+
+		fileCount, fileSize, err := uploadsService.GetStatistics()
+		if err != nil {
+			return
+		}
 		statsMsg := map[string]interface{}{
 			"type":       "stats",
-			"totalFiles": stats.TotalFiles,
-			"totalSize":  stats.TotalSize,
+			"totalFiles": fileCount,
+			"totalSize":  fileSize,
 		}
 		statsJSON, _ := json.Marshal(statsMsg)
-		statsMutex.Unlock()
 
 		connMutex.Lock()
 		for _, userConns := range connections {
@@ -253,13 +200,19 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request, uploadsService *ser
 	}
 
 	// 发送初始统计数据
-	statsMutex.Lock()
+	// statsMutex.Lock()
+
+	fileCount, fileSize, err := uploadsService.GetStatistics()
+	if err != nil {
+		return
+	}
+
 	conn.WriteJSON(map[string]interface{}{
 		"type":       "stats",
-		"totalFiles": stats.TotalFiles,
-		"totalSize":  stats.TotalSize,
+		"totalFiles": fileCount,
+		"totalSize":  fileSize,
 	})
-	statsMutex.Unlock()
+	// statsMutex.Unlock()
 
 	for {
 		_, msg, err := conn.ReadMessage()
@@ -302,7 +255,6 @@ func handleMessage(shareId, userId string, msg []byte, uploadsService *services.
 		if data["type"] == "wsf-stats" {
 			// if data["status"] == "accepted" {
 			if size, ok := data["fileSize"].(float64); ok {
-				updateStats(int64(size))
 
 				// 记录上传信息
 				filename, _ := data["filename"].(string)

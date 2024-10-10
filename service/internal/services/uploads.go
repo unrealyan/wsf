@@ -24,3 +24,7 @@ func (s *UploadService) GetUpload(id int64) (*models.Upload, error) {
 func (s *UploadService) ListUploads() ([]*models.Upload, error) {
 	return s.repo.List()
 }
+
+func (s *UploadService) GetStatistics() (int64, int64, error) {
+	return s.repo.GetStatistics()
+}

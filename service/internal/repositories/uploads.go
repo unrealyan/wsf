@@ -67,3 +67,17 @@ func (r *UploadRepository) List() ([]*models.Upload, error) {
 	}
 	return uploads, nil
 }
+
+// 新增方法
+func (r *UploadRepository) GetStatistics() (int64, int64, error) {
+	query := `SELECT COUNT(*), COALESCE(SUM(filesize), 0) FROM uploads`
+
+	var count int64
+	var totalSize int64
+	err := r.db.DB.QueryRow(query).Scan(&count, &totalSize)
+	if err != nil {
+		return 0, 0, fmt.Errorf("获取上传统计信息失败: %w", err)
+	}
+
+	return count, totalSize, nil
+}
