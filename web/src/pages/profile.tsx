@@ -3,6 +3,7 @@ import Header from "../components/header";
 import Tables from "../components/tables";
 import InfiniteScroll from "../components/list";
 import { FaSolidFile, FaSolidFileZipper, FaSolidFileImage, FaSolidFileAudio, FaSolidFileVideo } from 'solid-icons/fa'
+import WSFApiClient from "../api/apiClient";
 
 export default function Profile() {
     const senerData = {
@@ -37,13 +38,16 @@ export default function Profile() {
     const [hasMore, setHasMore] = createSignal(true);
 
     const loadMore = () => {
-        const newItems = senerData.body.map((item,key)=>{item.id=item.id+key+1; return item})
-        setTimeout(()=>{
-            setItems([...items(), ...newItems]);
-        },2000)
-        if (items().length >= 200) {
-            setHasMore(false);
-        }
+        WSFApiClient.get("/uploads").then(res=>{
+            console.log(res)
+        })
+        // const newItems = senerData.body.map((item,key)=>{item.id=item.id+key+1; return item})
+        // setTimeout(()=>{
+        //     setItems([...items(), ...newItems]);
+        // },2000)
+        // if (items().length >= 200) {
+        //     setHasMore(false);
+        // }
     };
 
     const getFileIcon = (filename: string) => {

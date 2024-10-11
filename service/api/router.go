@@ -13,7 +13,7 @@ import (
 
 func SetupRoutes(r *gin.Engine, db *database.SQLite) {
 	api := r.Group("/api")
-	// user
+
 	{
 		userRepo := repositories.NewUserRepository(db)
 		userService := services.NewUserService(userRepo)
@@ -26,6 +26,7 @@ func SetupRoutes(r *gin.Engine, db *database.SQLite) {
 		// 需要认证的路由
 		authorized := api.Group("/")
 		authorized.Use(JWTAuthMiddleware(userService))
+		// user
 		{
 			authorized.POST("/user", userHandler.CreateUser)
 			authorized.GET("/user/:id", userHandler.GetUser)
@@ -33,7 +34,20 @@ func SetupRoutes(r *gin.Engine, db *database.SQLite) {
 			authorized.DELETE("/user/:id", userHandler.DeleteUser)
 			authorized.GET("/users", userHandler.ListUsers)
 		}
+
+		// uploads
+		{
+			uploadsRepo := repositories.NewUploadRepository(db)
+			uploadsService := services.NewUploadService(uploadsRepo)
+			uploadsHandler := handlers.NewUploadsHandler(uploadsService)
+
+			{
+				authorized.GET("/uploads", uploadsHandler.FindListByUserId)
+			}
+
+		}
 	}
+
 }
 
 func JWTAuthMiddleware(userService *services.UserService) gin.HandlerFunc {

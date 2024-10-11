@@ -17,12 +17,16 @@ func (s *UploadService) CreateUpload(record *models.UploadRecord) error {
 	return s.repo.Create(record)
 }
 
-func (s *UploadService) GetUpload(id int64) (*models.Upload, error) {
+func (s *UploadService) GetUpload(id int64) (*models.UploadRecord, error) {
 	return s.repo.GetByID(id)
 }
 
-func (s *UploadService) ListUploads() ([]*models.Upload, error) {
+func (s *UploadService) ListUploads() ([]*models.UploadRecord, error) {
 	return s.repo.List()
+}
+
+func (s *UploadService) FindListByUserId(id string) ([]*models.UploadRecord, error) {
+	return s.repo.FindListByUserId(id)
 }
 
 func (s *UploadService) GetStatistics() (int64, int64, error) {

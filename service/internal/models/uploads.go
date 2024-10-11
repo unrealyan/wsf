@@ -2,12 +2,8 @@ package models
 
 import "time"
 
-type Upload struct {
-	ID int64 `json:"id"`
-	UploadRecord
-}
-
 type UploadRecord struct {
+	ID          int64     `json:"id,omitempty"`
 	SenderID    string    `json:"sender_id"`
 	SenderIP    string    `json:"sender_ip"`
 	Filename    string    `json:"filename"`
