@@ -25,8 +25,8 @@ func (s *UploadService) ListUploads() ([]*models.UploadRecord, error) {
 	return s.repo.List()
 }
 
-func (s *UploadService) FindListByUserId(id string) ([]*models.UploadRecord, error) {
-	return s.repo.FindListByUserId(id)
+func (s *UploadService) FindListByUserId(id string, page, pageSize int) (*models.PaginatedUploadRecords, error) {
+	return s.repo.FindListByUserId(id, page, pageSize)
 }
 
 func (s *UploadService) GetStatistics() (int64, int64, error) {

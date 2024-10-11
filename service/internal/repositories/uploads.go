@@ -80,11 +80,24 @@ func (r *UploadRepository) List() ([]*models.UploadRecord, error) {
 	return uploads, nil
 }
 
-func (r *UploadRepository) FindListByUserId(id string) ([]*models.UploadRecord, error) {
-	query := `SELECT id, sender_id, sender_ip, filename, filesize, send_time, receiver_id, receiver_ip, receive_time 
-		FROM uploads WHERE sender_id = ? ORDER BY send_time DESC`
+func (r *UploadRepository) FindListByUserId(id string, page, pageSize int) (*models.PaginatedUploadRecords, error) {
+	// 添加分页和计数查询
+	countQuery := `SELECT COUNT(*) FROM uploads WHERE sender_id = ?`
+	var totalCount int
+	err := r.db.DB.QueryRow(countQuery, id).Scan(&totalCount)
+	if err != nil {
+		return nil, fmt.Errorf("获取总记录数失败: %w", err)
+	}
 
-	rows, err := r.db.DB.Query(query, id)
+	// 计算总页数
+	totalPages := (totalCount + pageSize - 1) / pageSize
+
+	// 修改主查询以支持分页
+	query := `SELECT id, sender_id, sender_ip, filename, filesize, send_time, receiver_id, receiver_ip, receive_time 
+		FROM uploads WHERE sender_id = ? ORDER BY send_time DESC LIMIT ? OFFSET ?`
+
+	offset := (page - 1) * pageSize
+	rows, err := r.db.DB.Query(query, id, pageSize, offset)
 	if err != nil {
 		return nil, fmt.Errorf("获取上传记录列表失败: %w", err)
 	}
@@ -101,7 +114,14 @@ func (r *UploadRepository) FindListByUserId(id string) ([]*models.UploadRecord, 
 		}
 		uploads = append(uploads, &upload)
 	}
-	return uploads, nil
+
+	return &models.PaginatedUploadRecords{
+		Records:    uploads,
+		TotalCount: totalCount,
+		TotalPages: totalPages,
+		Page:       page,
+		PageSize:   pageSize,
+	}, nil
 }
 
 // 新增方法

@@ -13,3 +13,11 @@ type UploadRecord struct {
 	ReceiverIP  string    `json:"receiver_ip"`
 	ReceiveTime time.Time `json:"receive_time"`
 }
+
+type PaginatedUploadRecords struct {
+	Records    []*UploadRecord
+	TotalCount int
+	TotalPages int
+	Page       int
+	PageSize   int
+}
