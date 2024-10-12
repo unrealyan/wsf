@@ -22,7 +22,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	_ "github.com/joho/godotenv/autoload"
-	_ "modernc.org/sqlite"
+	_ "github.com/mattn/go-sqlite3" // 替换 modernc.org/sqlite
 )
 
 const (
@@ -49,13 +49,12 @@ var (
 	}
 )
 
-var _ *database.SQLite
-
 func main() {
 	fmt.Println("name: ", os.Getenv("JWT_SECRET"))
-	db, err := database.New("uploads.db")
+	// 修改数据库连接字符串
+	db, err := database.New("/var/lib/websf/uploads.db")
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		log.Fatalf("连接数据库失败: %v", err)
 	}
 	defer db.Close()
 
