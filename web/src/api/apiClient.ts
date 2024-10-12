@@ -9,21 +9,33 @@ interface ApiClient {
 
 class ApiClientImpl implements ApiClient {
     baseUrl: string;
-    private token: string | null;
 
     constructor(path: string) {
         this.baseUrl = path;
-        this.token = localStorage.token||"";
     }
 
     private getHeaders(): Headers {
         const headers = new Headers({
             'Content-Type': 'application/json',
         });
-        if (this.token) {
-            headers.append('Authorization', `Bearer ${this.token}`);
+        if (localStorage.token) {
+            headers.append('Authorization', `Bearer ${localStorage.token}`);
         }
         return headers;
+    }
+
+    private handleError(response: { status: number; }){
+        if (response.status == 400) {
+            throw new Error("api params error")
+        } else if (response.status == 401){
+            localStorage.clear()
+            location.href = "/"
+            throw new Error("login fail")
+        } else if (response.status >400 && response.status <500){
+            throw new Error("api fail")
+        } else if (response.status > 500){
+            throw new Error("system error")
+        } 
     }
 
     async get<P extends Object, T>(url: string, params?: P): Promise<T>  {
@@ -39,9 +51,7 @@ class ApiClientImpl implements ApiClient {
                 method: "GET",
                 headers: this.getHeaders()
             });
-            if (!response.ok) {
-                throw new Error(`Response status: ${response.status}`);
-            }
+            this.handleError(response)
             const json = await response.json();
             return json
         } catch (error: any) {
@@ -56,15 +66,7 @@ class ApiClientImpl implements ApiClient {
                 headers: this.getHeaders(),
                 body: JSON.stringify(data)
             })
-            if (response.status == 400) {
-                throw new Error("api params error")
-            } else if (response.status == 401){
-                throw new Error("login fail")
-            } else if (response.status >400 && response.status <500){
-                throw new Error("api fail")
-            } else if (response.status > 500){
-                throw new Error("system error")
-            } 
+            this.handleError(response)
            
             const json = await response.json();
             return json

@@ -4,6 +4,8 @@ import (
 	"app/internal/models"
 	"app/internal/repositories"
 	"errors"
+	"fmt"
+	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -77,7 +79,7 @@ func (s *UserService) Login(email, password string) (*models.User, error) {
 	return user, nil
 }
 
-var jwtKey = []byte("your_secret_key") // 在实际应用中,请使用更安全的密钥存储方式
+var jwtKey = []byte(os.Getenv("JWT_SECRET"))
 
 func GenerateToken(user *models.User) (string, error) {
 	expirationTime := time.Now().Add(24 * time.Hour)
@@ -87,6 +89,7 @@ func GenerateToken(user *models.User) (string, error) {
 		Subject:   user.UserID,
 	}
 
+	fmt.Println("jwtKey: ", jwtKey)
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString(jwtKey)
 }

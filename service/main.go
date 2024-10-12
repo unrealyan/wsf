@@ -11,6 +11,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -20,6 +21,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	_ "github.com/joho/godotenv/autoload"
 	_ "modernc.org/sqlite"
 )
 
@@ -47,10 +49,10 @@ var (
 	}
 )
 
-var db *database.SQLite
+var _ *database.SQLite
 
 func main() {
-
+	fmt.Println("name: ", os.Getenv("JWT_SECRET"))
 	db, err := database.New("uploads.db")
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
