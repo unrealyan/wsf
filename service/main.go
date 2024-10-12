@@ -21,7 +21,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	_ "github.com/joho/godotenv/autoload"
-	_ "github.com/mattn/go-sqlite3" // 替换 modernc.org/sqlite
+	_ "modernc.org/sqlite" // 使用纯 Go 实现的 SQLite 驱动
 )
 
 const (
