@@ -11,7 +11,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -50,7 +49,6 @@ var (
 )
 
 func main() {
-	fmt.Println("name: ", os.Getenv("JWT_SECRET"))
 	// 修改数据库连接字符串
 	db, err := database.New("/var/lib/websf/uploads.db")
 	if err != nil {
