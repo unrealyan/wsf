@@ -1,22 +1,27 @@
 package main
 
 import (
+	"app/api"
+	"app/internal/models"
+	"app/internal/repositories"
+	"app/internal/services"
+	"app/pkg/database"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
 	"math/rand"
 
-	"database/sql"
-
+	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	_ "github.com/joho/godotenv/autoload"
 	_ "modernc.org/sqlite"
 )
 
@@ -40,91 +45,72 @@ var (
 		CheckOrigin: func(r *http.Request) bool {
 			return true
 		},
+		Subprotocols: []string{"token"},
 	}
-
-	stats      Statistics
-	statsMutex sync.Mutex
-	statsFile  = "stats.json"
 )
 
-type Statistics struct {
-	TotalFiles int64 `json:"totalFiles"`
-	TotalSize  int64 `json:"totalSize"`
-}
-
-type UploadRecord struct {
-	SenderID    string
-	SenderIP    string
-	Filename    string
-	Filesize    int64
-	SendTime    time.Time
-	ReceiverID  string
-	ReceiverIP  string
-	ReceiveTime time.Time
-}
-
-var db *sql.DB
+var _ *database.SQLite
 
 func main() {
-	loadStats()
-
-	initDB()
+	fmt.Println("name: ", os.Getenv("JWT_SECRET"))
+	db, err := database.New("uploads.db")
+	if err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
+	}
 	defer db.Close()
 
-	http.HandleFunc("/ws", handleWebSocket)
+	// loadStats()
 
-	go broadcastStats()
+	// initDB()
 
-	log.Printf("WebSocket server listening on %d", WEBSOCKET_SERVER_PORT)
-	if err := http.ListenAndServe(fmt.Sprintf(":%d", WEBSOCKET_SERVER_PORT), nil); err != nil {
-		log.Fatal("ListenAndServe: ", err)
+	uploadsRepo := repositories.NewUploadRepository(db)
+	uploadsService := services.NewUploadService(uploadsRepo)
+
+	go broadcastStats(uploadsService)
+	gin.SetMode(gin.DebugMode)
+	r := gin.Default()
+
+	api.SetupRoutes(r, db)
+
+	// 创建一个新的http.ServeMux来处理WebSocket连接
+	wsMux := http.NewServeMux()
+	wsMux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		handleWebSocket(w, r, uploadsService)
+	})
+
+	// 启动WebSocket服务器
+	go func() {
+		log.Printf("WebSocket服务器正在监听端口 %d", WEBSOCKET_SERVER_PORT)
+		if err := http.ListenAndServe(fmt.Sprintf(":%d", WEBSOCKET_SERVER_PORT), wsMux); err != nil {
+			log.Fatal("ListenAndServe: ", err)
+		}
+	}()
+
+	// 启动Gin服务器
+	log.Println("Gin服务器正在启动...")
+	r.NoRoute(func(c *gin.Context) {
+		c.JSON(404, gin.H{"code": "PAGE_NOT_FOUND", "message": "Page not found"})
+	})
+	if err := r.Run(":8890"); err != nil {
+		log.Fatal("运行Gin服务器失败: ", err)
 	}
+
 }
 
-func loadStats() {
-	data, err := ioutil.ReadFile(statsFile)
-	if err != nil {
-		log.Println("无法读取统计文件，使用默认值")
-		return
-	}
-	err = json.Unmarshal(data, &stats)
-	if err != nil {
-		log.Println("解析统计文件失败，使用默认值")
-	}
-}
-
-func saveStats() {
-	data, err := json.Marshal(stats)
-	if err != nil {
-		log.Println("序列化统计数据失败:", err)
-		return
-	}
-	err = os.WriteFile(statsFile, data, 0644)
-	if err != nil {
-		log.Println("保存统计数据失败:", err)
-	}
-}
-
-func updateStats(fileSize int64) {
-	statsMutex.Lock()
-	defer statsMutex.Unlock()
-
-	stats.TotalFiles++
-	stats.TotalSize += fileSize
-	saveStats()
-}
-
-func broadcastStats() {
+func broadcastStats(uploadsService *services.UploadService) {
 	ticker := time.NewTicker(5 * time.Second)
 	for range ticker.C {
-		statsMutex.Lock()
+
+		fileCount, fileSize, err := uploadsService.GetStatistics()
+		if err != nil {
+			return
+		}
 		statsMsg := map[string]interface{}{
 			"type":       "stats",
-			"totalFiles": stats.TotalFiles,
-			"totalSize":  stats.TotalSize,
+			"totalFiles": fileCount,
+			"totalSize":  fileSize,
 		}
 		statsJSON, _ := json.Marshal(statsMsg)
-		statsMutex.Unlock()
 
 		connMutex.Lock()
 		for _, userConns := range connections {
@@ -136,8 +122,21 @@ func broadcastStats() {
 	}
 }
 
-func handleWebSocket(w http.ResponseWriter, r *http.Request) {
+func handleWebSocket(w http.ResponseWriter, r *http.Request, uploadsService *services.UploadService) {
 	forwardedFor := r.Header.Get("X-Forwarded-For")
+	subprotocols := r.Header.Get("Sec-Websocket-Protocol")
+	log.Println(subprotocols)
+	userId := ""
+	if subprotocols != "" {
+		token := strings.Split(subprotocols, ", ")[1]
+
+		claims, err := services.ValidateToken(token)
+		if err != nil {
+
+			return
+		}
+		userId = claims.Subject
+	}
 	if forwardedFor != "" {
 		r.RemoteAddr = forwardedFor
 	}
@@ -157,7 +156,7 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
-	userId := assignUserId()
+	// userId := assignUserId()
 	if role == "sender" {
 		if sender := getSender(shareId); sender != "" {
 			userId = sender
@@ -203,13 +202,19 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 发送初始统计数据
-	statsMutex.Lock()
+	// statsMutex.Lock()
+
+	fileCount, fileSize, err := uploadsService.GetStatistics()
+	if err != nil {
+		return
+	}
+
 	conn.WriteJSON(map[string]interface{}{
 		"type":       "stats",
-		"totalFiles": stats.TotalFiles,
-		"totalSize":  stats.TotalSize,
+		"totalFiles": fileCount,
+		"totalSize":  fileSize,
 	})
-	statsMutex.Unlock()
+	// statsMutex.Unlock()
 
 	for {
 		_, msg, err := conn.ReadMessage()
@@ -232,11 +237,11 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 			// sendReceiversList(shareId)
 			break
 		}
-		handleMessage(shareId, userId, msg)
+		handleMessage(shareId, userId, msg, uploadsService)
 	}
 }
 
-func handleMessage(shareId, userId string, msg []byte) {
+func handleMessage(shareId, userId string, msg []byte, uploadsService *services.UploadService) {
 	var data map[string]interface{}
 	err := json.Unmarshal(msg, &data)
 	if err != nil {
@@ -252,7 +257,6 @@ func handleMessage(shareId, userId string, msg []byte) {
 		if data["type"] == "wsf-stats" {
 			// if data["status"] == "accepted" {
 			if size, ok := data["fileSize"].(float64); ok {
-				updateStats(int64(size))
 
 				// 记录上传信息
 				filename, _ := data["filename"].(string)
@@ -265,16 +269,28 @@ func handleMessage(shareId, userId string, msg []byte) {
 				receiverIP := receiverRemoteIp
 				sendTime := time.Now()
 
-				go recordUpload(UploadRecord{
-					SenderID:    userId,
+				uploads := models.UploadRecord{
+					SenderID:    target,
 					SenderIP:    senderIP,
 					Filename:    filename,
 					Filesize:    int64(size),
 					SendTime:    sendTime,
-					ReceiverID:  target,
+					ReceiverID:  userId,
 					ReceiverIP:  receiverIP,
 					ReceiveTime: sendTime, // 暂时设置为相同时间，后续可以更新
-				})
+				}
+				uploadsService.CreateUpload(&uploads)
+
+				// go recordUpload(UploadRecord{
+				// 	SenderID:    userId,
+				// 	SenderIP:    senderIP,
+				// 	Filename:    filename,
+				// 	Filesize:    int64(size),
+				// 	SendTime:    sendTime,
+				// 	ReceiverID:  target,
+				// 	ReceiverIP:  receiverIP,
+				// 	ReceiveTime: sendTime, // 暂时设置为相同时间，后续可以更新
+				// })
 			}
 			// }
 		}
@@ -385,40 +401,40 @@ func removeElement(slice []string, element string) []string {
 	return slice
 }
 
-func initDB() {
-	var err error
-	db, err = sql.Open("sqlite", "/var/lib/websf/uploads.db")
-	// db, err = sql.Open("sqlite", "uploads.db")
-	if err != nil {
-		log.Fatal("打开数据库失败:", err)
-	}
+// func initDB() {
+// 	var err error
+// 	// db, err = sql.Open("sqlite", "/var/lib/websf/uploads.db")
+// 	db, err = sql.Open("sqlite", "uploads.db")
+// 	if err != nil {
+// 		log.Fatal("打开数据库失败:", err)
+// 	}
 
-	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS uploads (
-		sender_id TEXT,
-		sender_ip TEXT,
-		filename TEXT,
-		filesize INTEGER,
-		send_time DATETIME,
-		receiver_id TEXT,
-		receiver_ip TEXT,
-		receive_time DATETIME
-	)`)
-	if err != nil {
-		log.Fatal("创建表失败:", err)
-	}
-}
+// 	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS uploads (
+// 		sender_id TEXT,
+// 		sender_ip TEXT,
+// 		filename TEXT,
+// 		filesize INTEGER,
+// 		send_time DATETIME,
+// 		receiver_id TEXT,
+// 		receiver_ip TEXT,
+// 		receive_time DATETIME
+// 	)`)
+// 	if err != nil {
+// 		log.Fatal("创建表失败:", err)
+// 	}
+// }
 
-func recordUpload(record UploadRecord) {
-	_, err := db.Exec(`INSERT INTO uploads 
-		(sender_id, sender_ip, filename, filesize, send_time, receiver_id, receiver_ip, receive_time) 
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		record.SenderID, record.SenderIP, record.Filename, record.Filesize,
-		record.SendTime, record.ReceiverID, record.ReceiverIP, record.ReceiveTime)
+// func recordUpload(record UploadRecord) {
+// 	_, err := db.Exec(`INSERT INTO uploads
+// 		(sender_id, sender_ip, filename, filesize, send_time, receiver_id, receiver_ip, receive_time)
+// 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+// 		record.SenderID, record.SenderIP, record.Filename, record.Filesize,
+// 		record.SendTime, record.ReceiverID, record.ReceiverIP, record.ReceiveTime)
 
-	if err != nil {
-		log.Println("记录上传信息失败:", err)
-	}
-}
+// 	if err != nil {
+// 		log.Println("记录上传信息失败:", err)
+// 	}
+// }
 
 func getIP(addr net.Addr) string {
 	if tcpAddr, ok := addr.(*net.TCPAddr); ok {

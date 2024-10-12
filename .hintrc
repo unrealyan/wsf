@@ -6,11 +6,18 @@
     "axe/forms": [
       "default",
       {
-        "label": "off"
+        "label": "off",
+        "autocomplete-valid": "off"
       }
     ],
     "meta-viewport": "off",
     "no-inline-styles": "off",
-    "disown-opener": "off"
+    "disown-opener": "off",
+    "axe/name-role-value": [
+      "default",
+      {
+        "button-name": "off"
+      }
+    ]
   }
 }

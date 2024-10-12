@@ -1,8 +1,21 @@
 import { createStore } from 'solid-js/store';
-import { Component, createContext, useContext } from 'solid-js';
+import { Accessor, Component, createContext, createSignal, useContext } from 'solid-js';
 
 import WSFWebRTCImpl,{ WSFWebRTC } from './wsfrtc/webrtc';
 
+export type UserInfo = {
+  id:number|string
+  user_id:string
+  name: string
+  given_name: string
+  family_name: string
+  picture: string
+}
+
+export type AlertMessage = {
+  type:string;
+  message:string;
+}
 
 export interface User {
   id: string;
@@ -79,7 +92,9 @@ export interface StateType {
   reciever: IReceiver;
   receivers: Receiver[];
   offline:OfflineType;
-  isSahre:boolean
+  isSahre:boolean;
+  userInfo:UserInfo|null;
+  alertMsg:AlertMessage|null;
 }
 
 export interface ActionType {
@@ -103,13 +118,25 @@ export interface ActionType {
   setReceivers: (receivers: Receiver[]) => void;
   updateState: (newState: Partial<StateType>) => void;
   setOffline:(offline:OfflineType) => void;
-  setIsShare:(isShare:boolean)=>void
+  setIsShare:(isShare:boolean)=>void;
+  setUserInfo:(userInfo:UserInfo)=>void;
+  setAlertMsg:(msg:AlertMessage)=>void;
 }
 
 export type StoreType = [
   state: StateType,
-  action: ActionType
+  action: ActionType,
+  notice:{
+    [x: string]: any;
+    notification:Accessor<Notification>,
+    addNotification:(message:string)=>void
+  },
 ]
+
+export type Notification = {
+  id:number
+  message:string
+}
 
 // 创建一个 Store 的上下文，指定类型
 const StoreContext = createContext<StoreType | undefined>(undefined);
@@ -155,8 +182,20 @@ export default function StoreProvider(props: any) {
     },
     receivers:[],
     offline:{status:false,message:""},
-    isSahre:false
+    isSahre:false,
+    userInfo:null,
+    alertMsg:{
+      type:"",
+      message:""
+    },
   });
+
+  const [notification,setNotification ]= createSignal<Notification>({id:Date.now(),message:""})
+
+  const addNotification = (message:string)=>{
+    const newNotification = { id: Date.now(), message };
+    setNotification(newNotification);
+  }
 
   const updateState = (newState: Partial<StateType>) => {
     setState(prev => ({ ...prev, ...newState }));
@@ -185,8 +224,11 @@ export default function StoreProvider(props: any) {
       setReceivers: (receivers: Receiver[]) => setState('receivers', receivers),
       updateState: updateState,
       setOffline:(offline:OfflineType) => setState('offline',offline),
-      setIsShare:(isShare:boolean)=>setState("isSahre",isShare)
-    }
+      setIsShare:(isShare:boolean)=>setState("isSahre",isShare),
+      setUserInfo:(userInfo:UserInfo)=>setState("userInfo",userInfo),
+      setAlertMsg:(msg:AlertMessage)=>setState("alertMsg",msg)
+    },
+    {notification,addNotification},
   ];
 
   return (

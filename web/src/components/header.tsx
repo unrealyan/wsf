@@ -1,9 +1,33 @@
-import { useStore } from '../lib/store';
+import { onMount } from 'solid-js';
+import { StoreType, UserInfo, useStore } from '../lib/store';
 import Avatar from './avatar/avatar';
 import Logo from './logo/logo';
+import SignIn from './signIn';
+import SingOut from './signOut';
 
 export default function Header() {
-    const [state] = useStore()
+
+    const [state, action,{addNotification}]: StoreType = useStore();
+
+    onMount(() => {
+        try {
+            let token = localStorage.token
+            if (token) {
+                let info = token.split(".")?.[1]
+                let data = JSON.parse(atob(info))
+                if (new Date(data.exp *1000)>new Date()){
+                    let userInfo: UserInfo = JSON.parse(localStorage.user)
+                    action.setUserInfo(userInfo)
+                    addNotification("LOGIN_BY_GOOGLE")
+                }
+            }
+            
+        } catch (err) {
+            console.log(err)
+            action.setAlertMsg({type:"error",message:(err as string)||"解析token失败"})
+        }
+
+    })
 
     return <header class="sticky top-0 inset-x-0 flex flex-wrap items-center md:justify-start md:items-center md:flex-nowrap z-50 w-full md:w-[90%] m-auto text-sm">
         <nav class="mt-4 relative max-w-2xl lg:w-full bg-white border border-gray-200 rounded-[2rem] mx-2 py-2.5 md:flex md:items-center md:justify-between md:py-0 md:px-4 md:mx-auto dark:bg-neutral-900 dark:border-neutral-700 md:w-[80%]">
@@ -46,6 +70,9 @@ export default function Header() {
             </a>
         </div>
         {/* <Avatar userId={props.store.userId} /> */}
-        <Avatar userId={state.userId} />
+        {
+            state.userInfo?.user_id ? <><Avatar userId={state.userInfo.user_id} picture={state.userInfo.picture} /><SingOut/></>: <SignIn/>
+        }
+        
     </header>
 }

@@ -20,7 +20,9 @@ function Upload(props: any) {
     })
 
     const shareFile = async (file:File|undefined) => {
-        WSClient.sendFileReadyNotice(state.userId,state.shareId)
+        if (file) {
+            WSClient.sendFileReadyNotice(state.userId,state.shareId)
+        }
     }
 
     const change = (event: any) => {

@@ -1,4 +1,4 @@
-import { createSignal, onMount } from "solid-js"
+import { createEffect, createSignal, onMount } from "solid-js"
 import { StoreType, useStore } from "../lib/store";
 import WSFWebRTCImpl from "../lib/wsfrtc/webrtc";
 import WSClient from "../lib/wsfws/webSocket";
@@ -6,21 +6,30 @@ import ProgressBar from "../components/progress/progress";
 import Offline from "../components/offline/offline";
 
 export default function Receiver(props: any) {
-    const [state, action]: StoreType = useStore();
+    const [state, action,{notification}]: StoreType = useStore();
     const [webRTCReceiver, setWebRTCReceiver] = createSignal<WSFWebRTCImpl | undefined>();
     const [receivedFile, setReceivedFile] = createSignal<boolean>(false);
 
     let receiverProgressRef: { open: () => void, close: () => void, setValue: (value: number) => void, setSpeed: (speed: number) => void, setDone: (done: boolean) => void, status: boolean };
     onMount(() => {
 
-        WSClient.on("SET_USER_ID", getSelfId)
-        WSClient.on("SET_SHARE_ID", getShareId)
-        WSClient.on("SET_TARGETID", setTargetId)
-        WSClient.on("INIT_RECEIVER", onInitReceiver)
-        WSClient.on("SET_OFFLINE", setOffline)
-        WSClient.on("SET_ONLINE", setOnline)
+        
 
     }) 
+
+
+    createEffect(()=>{
+        let notice = notification();
+        if (notice.message === "LOGIN_BY_GOOGLE") {
+            WSClient.start()
+            WSClient.on("SET_USER_ID", getSelfId)
+            WSClient.on("SET_SHARE_ID", getShareId)
+            WSClient.on("SET_TARGETID", setTargetId)
+            WSClient.on("INIT_RECEIVER", onInitReceiver)
+            WSClient.on("SET_OFFLINE", setOffline)
+            WSClient.on("SET_ONLINE", setOnline)
+        }
+    })
 
     const setOffline = (data: any) => {
         action.setOffline({ status: true, message: data.message })

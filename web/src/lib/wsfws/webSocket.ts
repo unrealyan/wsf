@@ -1,4 +1,3 @@
-import eventManager, { EventManager } from '../eventManager';
 
 export interface IWebSocket {
     ws: WebSocket | null;
@@ -28,10 +27,12 @@ const uuidRegex = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}
 export class WSFWebSocket implements IWebSocket {
     ws!: WebSocket;
     role: string
+    shareId:string
     protected eventListeners: { [key: string]: Function } = {};
 
     constructor() {
-        let shareId = sessionStorage.getItem("shareId") || "";
+        this.shareId = sessionStorage.getItem("shareId") || "";
+        let {shareId} = this
         const urlShareId = urlSP.get("s") || "";
         this.role = urlShareId ? "receiver" : "sender"
         if (urlShareId && uuidRegex.test(urlShareId)) {
@@ -42,8 +43,10 @@ export class WSFWebSocket implements IWebSocket {
         } else {
             shareId = "";
         }
+    }
 
-
+    start(){
+        let {shareId} = this
         const wsUrl = new URL(WEBSOCKET_URL);
         if (shareId) {
             wsUrl.searchParams.set("s", shareId);
@@ -51,9 +54,11 @@ export class WSFWebSocket implements IWebSocket {
         wsUrl.searchParams.set("r", this.role);
 
         this.connect(wsUrl.toString());
+        this.onmessage();
     }
+
     connect(url: string) {
-        this.ws = new WebSocket(url);
+        this.ws = new WebSocket(url,["token",localStorage.token]);
         this.ws.onopen = () => console.log("Connected to " + url);
         this.ws.onclose = () => {
             console.log("Disconnected from " + url)
@@ -279,5 +284,5 @@ export class WSFWebSocket implements IWebSocket {
 }
 
 const WSClient = new WSFWebSocket();
-WSClient.onmessage();
+// WSClient.onmessage();
 export default WSClient

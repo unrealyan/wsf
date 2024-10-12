@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 import solidPlugin from 'vite-plugin-solid';
 // import devtools from 'solid-devtools/vite';
 import dotenv from 'dotenv';
+import { resolve } from 'path'
 
 
 import path from 'path';
@@ -26,14 +27,20 @@ export default defineConfig({
   server: {
     // origin:"wsf.io",
     cors:true,
-    // hmr:{
-    //   host:"wsf.io",
-    // },
+    hmr:{
+      host:"wsf.ptcl.one",
+    },
     host:true,
     port: 3000,
   },
   build: {
     target: 'esnext',
+    rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'index.html'),
+        login: resolve(__dirname, 'login.html'),
+      },
+    },
   },
   define: {
     'process.env': JSON.stringify(env),

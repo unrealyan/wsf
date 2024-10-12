@@ -19,3 +19,30 @@ body {
   background-color: #0c1016;
   /* animation: move-background 20s linear infinite; */
 }
+
+.login-container {
+  background-color: #ffffff; /* 背景色为白色 */
+  color: #000000; /* 字体颜色为黑色 */
+  padding: 20px;
+  border: 1px solid #000000; /* 黑色边框 */
+  border-radius: 5px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); /* 轻微阴影 */
+}
+
+.error-message {
+  color: #ff0000; /* 错误信息为红色 */
+}
+
+.github-login, .google-login {
+  background-color: #000000; /* 按钮背景色为黑色 */
+  color: #ffffff; /* 按钮字体颜色为白色 */
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s; /* 添加过渡效果 */
+}
+
+.github-login:hover, .google-login:hover {
+  background-color: #444444; /* 悬停时变为深灰色 */
+}
