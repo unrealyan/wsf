@@ -11,11 +11,20 @@ export default function Header() {
 
     onMount(() => {
         try {
-            let userInfo: UserInfo = JSON.parse(localStorage.user)
-            action.setUserInfo(userInfo)
-            addNotification("LOGIN_BY_GOOGLE")
+            let token = localStorage.token
+            if (token) {
+                let info = token.split(".")?.[1]
+                let data = JSON.parse(atob(info))
+                if (new Date(data.exp *1000)>new Date()){
+                    let userInfo: UserInfo = JSON.parse(localStorage.user)
+                    action.setUserInfo(userInfo)
+                    addNotification("LOGIN_BY_GOOGLE")
+                }
+            }
+            
         } catch (err) {
             console.log(err)
+            action.setAlertMsg({type:"error",message:(err as string)||"解析token失败"})
         }
 
     })
