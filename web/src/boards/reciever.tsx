@@ -20,15 +20,15 @@ export default function Receiver(props: any) {
 
     createEffect(()=>{
         let notice = notification();
-        if (notice.message === "LOGIN_BY_GOOGLE") {
-            WSClient.start()
+        WSClient.start()
+        // if (notice.message === "LOGIN_BY_GOOGLE") {
             WSClient.on("SET_USER_ID", getSelfId)
             WSClient.on("SET_SHARE_ID", getShareId)
             WSClient.on("SET_TARGETID", setTargetId)
             WSClient.on("INIT_RECEIVER", onInitReceiver)
             WSClient.on("SET_OFFLINE", setOffline)
             WSClient.on("SET_ONLINE", setOnline)
-        }
+        // }
     })
 
     const setOffline = (data: any) => {
@@ -44,7 +44,6 @@ export default function Receiver(props: any) {
     }
 
     const getSelfId = (id: string) => {
-        console.log(id)
         action.setUserId(id)
     }
     const setTargetId = (id: string) => {
@@ -101,7 +100,6 @@ export default function Receiver(props: any) {
     const onErrorRTC = () =>{
         // close webrtc
     }
-
 
     return <div class="col-span-full w-[90%] bg-white p-10 mt-8 mr-auto ml-auto rounded">
         <label for="cover-photo" class="flex font-medium leading-6 text-gray-900 text-2xl m-10 justify-center">WebRTC File Sharing</label>
