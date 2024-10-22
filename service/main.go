@@ -50,8 +50,8 @@ var (
 
 func main() {
 	// 修改数据库连接字符串
-	// db, err := database.New("/var/lib/websf/uploads.db?cache=shared&mode=rwc")
-	db, err := database.New("uploads.db")
+	db, err := database.New("/var/lib/websf/uploads.db?cache=shared&mode=rwc")
+	// db, err := database.New("uploads.db")
 	if err != nil {
 		log.Fatalf("连接数据库失败: %v", err)
 	}
