@@ -14,7 +14,7 @@ export interface IWebSocket {
     sendProgress: (data: string) => void;
     sendFile: (data: string) => void;
     sendDone: (data: string) => void;
-    sendError: (data: string) => void;
+    sendError: <T extends {userId:string,shareId:string,msg:string}>(data: T) => void;
 }
 
 const urlSP = new URLSearchParams(window.location.search);
@@ -58,7 +58,8 @@ export class WSFWebSocket implements IWebSocket {
     }
 
     connect(url: string) {
-        this.ws = new WebSocket(url,["token",localStorage.token]);
+        // this.ws = new WebSocket(url,["token",localStorage.token]);
+        this.ws = new WebSocket(url);
         this.ws.onopen = () => console.log("Connected to " + url);
         this.ws.onclose = () => {
             console.log("Disconnected from " + url)
@@ -183,8 +184,14 @@ export class WSFWebSocket implements IWebSocket {
     sendDone = (data: string) => {
 
     };
-    sendError = (data: string) => {
-
+    sendError = ({userId,shareId,msg}:{userId:string,shareId:string,msg:string}) => {
+        let data = JSON.stringify({
+            type:"error",
+            userId,
+            shareId,
+            message:msg
+        })
+        this.ws?.send(data)
     };
 
     sendFileReadyNotice = (userId:string,shareId:string)=>{

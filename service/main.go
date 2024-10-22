@@ -44,13 +44,14 @@ var (
 		CheckOrigin: func(r *http.Request) bool {
 			return true
 		},
-		Subprotocols: []string{"token"},
+		// Subprotocols: []string{"token"},
 	}
 )
 
 func main() {
 	// 修改数据库连接字符串
-	db, err := database.New("/var/lib/websf/uploads.db?cache=shared&mode=rwc")
+	// db, err := database.New("/var/lib/websf/uploads.db?cache=shared&mode=rwc")
+	db, err := database.New("uploads.db")
 	if err != nil {
 		log.Fatalf("连接数据库失败: %v", err)
 	}
@@ -123,7 +124,7 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request, uploadsService *ser
 	forwardedFor := r.Header.Get("X-Forwarded-For")
 	subprotocols := r.Header.Get("Sec-Websocket-Protocol")
 	log.Println(subprotocols)
-	userId := ""
+	userId := assignUserId()
 	if subprotocols != "" {
 		token := strings.Split(subprotocols, ", ")[1]
 
@@ -297,6 +298,12 @@ func handleMessage(shareId, userId string, msg []byte, uploadsService *services.
 		sendReceivers(shareId, map[string]interface{}{
 			"type":   "file-ready",
 			"target": userId,
+		})
+	case "error":
+		sendReceivers(shareId, map[string]interface{}{
+			"type":    "error",
+			"target":  userId,
+			"message": "sender-offline",
 		})
 
 	case "offer", "answer", "new-ice-candidate", "request-file", "accept-request", "request-status":
