@@ -429,7 +429,7 @@ class WSFWebRTCImpl implements WSFWebRTC {
                 this.isReceiving = false;
             } else {
                 await fileReceiver.receiveChunk(data);
-                this.receivedSize += data.byteLength;
+                this.receivedSize += data.byteLength || data.size;
                 const progress = Math.ceil(this.receivedSize / (fileInfo.size / 100));
 
                 const currentTime = Date.now();
